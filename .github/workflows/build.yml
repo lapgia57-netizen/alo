@@ -1,0 +1,142 @@
+name: Build Mobile Apps (Android & iOS)
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  # ================= JOB BUILD ANDROID =================
+  build-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24' # Cập nhật lên Node 24 để tránh lỗi deprecation
+          # Đã bỏ dòng cache: 'npm' để tránh lỗi "Dependencies lock file is not found"
+          # Nếu muốn bật lại cache, hãy đảm bảo bạn đã commit file package-lock.json lên git
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept licenses
+        run: yes | sdkmanager --licenses || true
+
+      # Thêm bước web build trước khi đồng bộ Capacitor (bắt buộc với đa số project)
+      - name: Web Build
+        run: npm run build --if-present
+
+      - name: Add Android platform
+        run: npx cap add android || true
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Optimize Gradle
+        run: |
+          cat >> android/gradle.properties << 'EOF'
+          org.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8
+          org.gradle.parallel=true
+          org.gradle.caching=true
+          android.enableR8.fullMode=true
+          android.enableResourceOptimizations=true
+          EOF
+          sed -i 's/minifyEnabled false/minifyEnabled true/' android/app/build.gradle || true
+          sed -i 's/shrinkResources false/shrinkResources true/' android/app/build.gradle || true
+
+      - name: Build Debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --build-cache
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: so-thu-chi-android
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+
+      - name: Show size
+        run: find android -name "*.apk" -type f -exec ls -lh {} \;
+
+  # ================= JOB BUILD IOS =================
+  build-ios:
+    runs-on: macos-latest # Bắt buộc dùng macOS để build iOS
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Web Build
+        run: npm run build --if-present
+
+      - name: Add iOS platform
+        run: npx cap add ios || true
+
+      - name: Sync Capacitor
+        run: npx cap sync ios
+
+      # Cài đặt CocoaPods cho iOS
+      - name: Install Pods
+        working-directory: ios/App
+        run: pod install
+
+      # Build xuất ra file .ipa (Dạng Debug/Ad-Hoc không cần chứng chỉ trả phí Xcode)
+      - name: Build iOS App
+        run: |
+          xcodebuild -workspace ios/App/App.xcworkspace \
+                     -scheme App \
+                     -configuration Debug \
+                     -sdk iphoneos \
+                     -allowProvisioningUpdates \
+                     build \
+                     CODE_SIGNING_ALLOWED=NO
+
+      # Nén thư mục .app thành file .ipa để có thể cài đặt thử nghiệm
+      - name: Package IPA
+        run: |
+          mkdir -p ios/build/Payload
+          cp -r ~/Library/Developer/Xcode/DerivedData/*/Build/Products/Debug-iphoneos/App.app ios/build/Payload/
+          cd ios/build && zip -r App.ipa Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: so-thu-chi-ios
+          path: ios/build/App.ipa
+          retention-days: 14
