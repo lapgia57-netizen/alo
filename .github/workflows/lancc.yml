@@ -3,7 +3,7 @@ name: Build Debug APK
 on:
   push:
     branches: [ main, master ]
-  workflow_dispatch:          # Cho phép bấm chạy thủ công
+  workflow_dispatch:
 
 jobs:
   build-android:
@@ -34,11 +34,20 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      # ========== FIX QUAN TRỌNG ==========
+      # Dùng v4 (đã bỏ package "tools" bị Google gỡ)
+      # hoặc chỉ cài platform-tools
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
 
-      - name: Accept Android licenses
-        run: yes | sdkmanager --licenses >/dev/null || true
+      - name: Accept Android licenses + cài platform & build-tools
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          # Cài những thứ Capacitor thường cần
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" || true
+          sdkmanager "platforms;android-33" "build-tools;33.0.2" || true
 
       - name: Web build (nếu có)
         run: npm run build --if-present
@@ -46,7 +55,7 @@ jobs:
       - name: Add Android platform (nếu chưa có)
         run: npx cap add android || true
 
-      - name: Sync Capacitor → Android
+      - name: Sync Capacitor
         run: npx cap sync android
 
       - name: Tối ưu Gradle
@@ -64,7 +73,7 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon --build-cache --stacktrace
 
-      - name: Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: so-thu-chi-debug-apk
