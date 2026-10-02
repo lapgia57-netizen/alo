@@ -20,6 +20,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Sử dụng JDK 17 (hoặc 11) kết hợp với ép biến môi trường mã hóa hệ thống
       - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
@@ -45,34 +46,30 @@ jobs:
           build-root-directory: ${{ env.PROJECT_DIR }}
           generate-submit-arguments: true 
 
-      # BƯỚC SỬA LỖI: Tự động chèn resource màu bị thiếu nếu file colors.xml không có
+      # BƯỚC SỬA LỖI 1: Tự động chèn màu background bị thiếu nếu file colors.xml trống
       - name: Fix Missing Icon Resource
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
           COLORS_FILE="app/src/main/res/values/colors.xml"
-          
-          # 1. Tạo thư mục và file colors.xml cơ bản nếu hoàn toàn không tồn tại
           if [ ! -f "$COLORS_FILE" ]; then
             mkdir -p "app/src/main/res/values"
             echo '<?xml version="1.0" encoding="utf-8"?>' > $COLORS_FILE
             echo '<resources>' >> $COLORS_FILE
             echo '    <color name="ic_launcher_background">#FFFFFF</color>' >> $COLORS_FILE
             echo '</resources>' >> $COLORS_FILE
-            echo "✅ Đã tạo mới file colors.xml và thêm ic_launcher_background"
           else
-            # 2. Nếu file tồn tại nhưng chưa có mã màu ic_launcher_background thì chèn vào trước thẻ đóng </resources>
             if ! grep -q "ic_launcher_background" "$COLORS_FILE"; then
               sed -i 's|</resources>|    <color name="ic_launcher_background">#FFFFFF</color>\n</resources>|' $COLORS_FILE
-              echo "✅ Đã tự động chèn ic_launcher_background vào colors.xml"
-            else
-              echo "ℹ️ Biến ic_launcher_background đã tồn tại sẵn."
             fi
           fi
 
       - name: Build Debug APK
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
+        # Ép hệ thống Ubuntu nhận diện tiếng Việt / UTF-8 để Javac không bị lỗi ký tự lạ
+        env:
+          JAVA_TOOL_OPTIONS: "-Dfile.encoding=UTF-8"
         run: |
           # 1. Khởi tạo nhanh Gradle Wrapper nếu dự án bị thiếu file gradlew
           if [ ! -f "./gradlew" ]; then
@@ -86,12 +83,18 @@ jobs:
           # 3. Tạo cấu hình môi trường Android SDK
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           
-          # 4. TỰ ĐỘNG CẤU HÌNH SỬA LỖI ANDROIDX TẠI ĐÂY
+          # 4. TỰ ĐỘNG VÁ HỆ THỐNG GRADLE PROPERTIES (Sửa lỗi ép kiểu Javac cũ & AndroidX)
+          > gradle.properties # Làm sạch cấu hình tạm thời
           echo "android.useAndroidX=true" >> gradle.properties
           echo "android.enableJetifier=true" >> gradle.properties
-          echo "✅ Đã tự động kích hoạt android.useAndroidX trong gradle.properties"
+          echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> gradle.properties
+          echo "android.nonTransitiveRClass=false" >> gradle.properties
+          echo "✅ Đã tối ưu hóa thuộc tính biên dịch trong gradle.properties"
           
-          # 5. Chạy lệnh đóng gói (Build) thành file APK
+          # 5. Dọn dẹp cache cục bộ trước khi compile để tránh dính code lỗi cũ
+          ./gradlew clean
+          
+          # 6. Chạy lệnh đóng gói (Build) kèm in log tối đa nếu có lỗi phát sinh
           ./gradlew assembleDebug --stacktrace --no-daemon
 
       - name: Upload APK
