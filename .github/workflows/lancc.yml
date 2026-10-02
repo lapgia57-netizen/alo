@@ -20,7 +20,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Thiết lập cấu hình JDK 17 chuẩn hóa cho hệ thống
+      # Thiết lập JDK 17 chuẩn hóa cho cả hệ thống biên dịch
       - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
@@ -46,7 +46,7 @@ jobs:
           build-root-directory: ${{ env.PROJECT_DIR }}
           generate-submit-arguments: true 
 
-      # Tự động chèn màu background bị thiếu cho Icon
+      # Tự động chèn màu background bị thiếu nếu file colors.xml trống
       - name: Fix Missing Icon Resource
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
@@ -67,6 +67,7 @@ jobs:
       - name: Build Debug APK
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
+        # Thiết lập biến hệ thống UTF-8 để Javac đọc hiểu các comment tiếng Việt / ký tự lạ không bị lỗi
         env:
           JAVA_TOOL_OPTIONS: "-Dfile.encoding=UTF-8"
         run: |
@@ -78,29 +79,24 @@ jobs:
           chmod +x ./gradlew
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           
-          # 1. ĐỒNG BỘ CẤU HÌNH BIÊN DỊCH TRONG GRADLE PROPERTIES
+          # TỰ ĐỘNG LÀM SẠCH VÀ RE-CONFIG HỆ THỐNG GRADLE PROPERTIES
           > gradle.properties
           echo "android.useAndroidX=true" >> gradle.properties
           echo "android.enableJetifier=true" >> gradle.properties
           echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> gradle.properties
           echo "android.nonTransitiveRClass=false" >> gradle.properties
           
-          # 2. ÉP TRÌNH BIÊN DỊCH JAVA SHOW LỖI RA CONSOLE (SỬA LỖI ẨN LOG CỦA GRADLE 8.X)
-          # Thao tác chèn code cấu hình hiển thị lỗi trực tiếp vào build.gradle gốc của app
-          if [ -f "app/build.gradle" ]; then
-            echo -e "\ngradle.projectsEvaluated {\n    tasks.withType(JavaCompile) {\n        options.compilerArgs << \"-Xmaxerrs\" << \"500\"\n    }\n}" >> app/build.gradle
-          fi
-
+          # Ép xóa cache bị lỗi cũ trước khi chạy Javac
           ./gradlew clean
           
-          # 3. KÍCH HOẠT LỆNH BIÊN DỊCH CHỐNG ẨN LOG
-          ./gradlew assembleDebug --stacktrace --no-daemon || {
+          # ÉP BIÊN DỊCH IN LỖI JAVA RA MÀN HÌNH (SỬA LỖI GIẤU LOG CỦA GRADLE)
+          ./gradlew assembleDebug -Dorg.gradle.logging.level=lifecycle --stacktrace --no-daemon || {
              echo "=========================================================================="
-             echo "❌ PHÁT HIỆN LỖI CODE: ĐANG DUMP CHI TIẾT FILE BỊ LỖI RA TERMINAL..."
+             echo "❌ PHÁT HIỆN LỖI TRONG CODE LOGIC! ĐANG DUMP CHI TIẾT FILE BỊ LỖI RA TERMINAL..."
              echo "=========================================================================="
-             # Lệnh quét sâu tìm kiếm chính xác file Java/Kotlin chứa từ khóa báo lỗi của compiler
-             find . -name "reports" -type d -exec grep -rni "error:" {} + 2>/dev/null || true
-             find . -name "*.log" -exec grep -ni "error:" {} + 2>/dev/null || true
+             # Tìm kiếm sâu các file lỗi compile bị Gradle ẩn trong bộ nhớ để in đè ra console công khai
+             find . -name "compile*Output.txt" -exec cat {} \; 2>/dev/null || true
+             find app/build/reports/ -name "*.html" -exec head -n 100 {} \; 2>/dev/null || true
              exit 1
           }
 
