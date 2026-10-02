@@ -40,18 +40,6 @@ jobs:
           echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
           echo "Found project directory at: $PROJECT_DIR"
 
-      - name: Generate Gradle Wrapper (if missing)
-        working-directory: ${{ env.PROJECT_DIR }}
-        shell: bash
-        run: |
-          if [ ! -f "./gradlew" ]; then
-            echo "⚠️️ Không thấy gradlew, đang dùng Gradle cài sẵn để khởi tạo Wrapper 8.4..."
-            # Cài đặt gradle CLI nhanh nếu chưa có
-            sudo apt-get update -qq && sudo apt-get install -y -qq gradle
-            gradle wrapper --gradle-version 8.4
-          fi
-          chmod +x ./gradlew
-
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -61,8 +49,8 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
-          # Tự động tạo local.properties
-          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          # Bật quyền thực thi cho gradlew
+          chmod +x ./gradlew
           
           # Thực hiện build
           ./gradlew assembleDebug --stacktrace --no-daemon
