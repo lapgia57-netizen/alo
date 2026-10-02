@@ -20,13 +20,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # NÂNG CẤP LÊN JDK 17 (Hoặc JDK 21 nếu dự án của bạn đời mới) để tránh lỗi cú pháp Java không tương thích
+      # 1. Cấu hình môi trường Java 17 chuẩn hóa
       - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
+      # 2. Tự động tìm thư mục gốc chứa dự án Android
       - name: Find Project Root Directory
         id: find_project
         shell: bash
@@ -40,12 +41,14 @@ jobs:
           echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
           echo "Found project directory at: $PROJECT_DIR"
 
+      # 3. Kích hoạt hệ thống hỗ trợ Gradle Actions chính thức
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           build-root-directory: ${{ env.PROJECT_DIR }}
           generate-submit-arguments: true 
 
+      # 4. Tự động chèn màu background bị thiếu nếu file colors.xml trống
       - name: Fix Missing Icon Resource
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
@@ -63,6 +66,7 @@ jobs:
             fi
           fi
 
+      # 5. Tiến hành dọn dẹp hệ thống và ép biên dịch Java hiện lỗi chi tiết
       - name: Build Debug APK
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
@@ -77,28 +81,20 @@ jobs:
           chmod +x ./gradlew
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           
-          # CẤU HÌNH TOÀN DIỆN ÉP SỬA LỖI MÃ HÓA TIẾNG VIỆT TRONG PROPERTIES
+          # Cấu hình tối ưu hóa tệp thuộc tính để tránh lỗi font chữ tiếng Việt
           > gradle.properties
           echo "android.useAndroidX=true" >> gradle.properties
           echo "android.enableJetifier=true" >> gradle.properties
           echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> gradle.properties
           echo "android.nonTransitiveRClass=false" >> gradle.properties
           
-          # ÉP JAVAC KHÔNG ĐƯỢC GIẤU LỖI, IN THẲNG RA ĐỂ NGƯỜI DÙNG NHÌN THẤY NGAY
-          if [ -f "app/build.gradle" ]; then
-            echo -e "\ngradle.projectsEvaluated {\n    tasks.withType(JavaCompile) {\n        options.compilerArgs << \"-Xlint:unchecked\" << \"-Xlint:deprecation\"\n        options.encoding = 'UTF-8'\n        options.fork = false\n    }\n}" >> app/build.gradle
-          fi
-          
+          # Làm sạch triệt để bộ nhớ đệm trước khi build
           ./gradlew clean
           
-          # CHẠY LỆNH BUILD ÉP IN RA TỪNG DÒNG LOG SAI SÓT CỦA FILE JAVA
-          ./gradlew assembleDebug --stacktrace --no-daemon -Dorg.gradle.logging.level=lifecycle || {
-             echo "=========================================================================="
-             echo "❌ PHÁT HIỆN LỖI TRONG CODE LOGIC TRONG FILE JAVA HOẶC KOTLIN!"
-             echo "=========================================================================="
-             exit 1
-          }
+          # THAY ĐỔI CỐT LÕI: Thêm cờ --info để ép bóc trần toàn bộ mã lỗi Java sai cú pháp ra màn hình log
+          ./gradlew assembleDebug --info --stacktrace --no-daemon
 
+      # 6. Xuất bản tệp APK lên mục Artifacts nếu build thành công
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
