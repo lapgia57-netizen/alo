@@ -45,6 +45,31 @@ jobs:
           build-root-directory: ${{ env.PROJECT_DIR }}
           generate-submit-arguments: true 
 
+      # BƯỚC SỬA LỖI: Tự động chèn resource màu bị thiếu nếu file colors.xml không có
+      - name: Fix Missing Icon Resource
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          COLORS_FILE="app/src/main/res/values/colors.xml"
+          
+          # 1. Tạo thư mục và file colors.xml cơ bản nếu hoàn toàn không tồn tại
+          if [ ! -f "$COLORS_FILE" ]; then
+            mkdir -p "app/src/main/res/values"
+            echo '<?xml version="1.0" encoding="utf-8"?>' > $COLORS_FILE
+            echo '<resources>' >> $COLORS_FILE
+            echo '    <color name="ic_launcher_background">#FFFFFF</color>' >> $COLORS_FILE
+            echo '</resources>' >> $COLORS_FILE
+            echo "✅ Đã tạo mới file colors.xml và thêm ic_launcher_background"
+          else
+            # 2. Nếu file tồn tại nhưng chưa có mã màu ic_launcher_background thì chèn vào trước thẻ đóng </resources>
+            if ! grep -q "ic_launcher_background" "$COLORS_FILE"; then
+              sed -i 's|</resources>|    <color name="ic_launcher_background">#FFFFFF</color>\n</resources>|' $COLORS_FILE
+              echo "✅ Đã tự động chèn ic_launcher_background vào colors.xml"
+            else
+              echo "ℹ️ Biến ic_launcher_background đã tồn tại sẵn."
+            fi
+          fi
+
       - name: Build Debug APK
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
