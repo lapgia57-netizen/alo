@@ -1,4 +1,5 @@
 name: Build SoThuChi APK
+
 on:
   push:
     branches: [ main, master ]
@@ -42,24 +43,30 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           build-root-directory: ${{ env.PROJECT_DIR }}
-          # Tự động tạo Gradle Wrapper nếu dự án của bạn thiếu file gradlew
           generate-submit-arguments: true 
 
       - name: Build Debug APK
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
-          # 1. Nếu thiếu wrapper, tiến hành khởi tạo nhanh thông qua lệnh gradle có sẵn của môi trường
+          # 1. Khởi tạo nhanh Gradle Wrapper nếu dự án bị thiếu file gradlew
           if [ ! -f "./gradlew" ]; then
             echo "⚠️ Không tìm thấy ./gradlew, đang khởi tạo nhanh Gradle Wrapper..."
             gradle wrapper --gradle-version 8.4
           fi
           
-          # 2. Cấp quyền thực thi và tạo cấu hình môi trường
+          # 2. Cấp quyền thực thi cho script wrapper
           chmod +x ./gradlew
+          
+          # 3. Tạo cấu hình môi trường Android SDK
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           
-          # 3. Chạy lệnh Build APK
+          # 4. TỰ ĐỘNG CẤU HÌNH SỬA LỖI ANDROIDX TẠI ĐÂY
+          echo "android.useAndroidX=true" >> gradle.properties
+          echo "android.enableJetifier=true" >> gradle.properties
+          echo "✅ Đã tự động kích hoạt android.useAndroidX trong gradle.properties"
+          
+          # 5. Chạy lệnh đóng gói (Build) thành file APK
           ./gradlew assembleDebug --stacktrace --no-daemon
 
       - name: Upload APK
