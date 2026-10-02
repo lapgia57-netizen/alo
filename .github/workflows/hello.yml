@@ -15,28 +15,30 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up JDK 11
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
-          cache: 'gradle'
+          java-version: '11'
 
-      - name: Generate Wrapper and Build APK
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '7.5'
+
+      - name: Build Debug APK
         run: |
-          # Chuyển vào thư mục mã nguồn SoThuChiJava nếu tồn tại
+          # Chuyển vào thư mục SoThuChiJava nếu code nằm trong thư mục con
           if [ -d "SoThuChiJava" ]; then
             cd SoThuChiJava
           fi
+
+          # Tự động tạo wrapper nếu chưa có
+          gradle wrapper --gradle-version 7.5
           
-          # Tự động khởi tạo Gradle Wrapper tương thích
-          gradle wrapper
-          
-          # Cấp quyền thực thi cho gradlew vừa tạo
+          # Cấp quyền và build APK
           chmod +x gradlew
-          
-          # Chạy build Debug APK với JVM 17
-          ./gradlew assembleDebug --stacktrace -Dorg.gradle.jvmargs="-Xmx2048m"
+          ./gradlew assembleDebug --stacktrace
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
