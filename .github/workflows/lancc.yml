@@ -26,49 +26,51 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
-        with:
-          packages: platform-tools
-
-      - name: Accept licenses + install platform 34
-        run: |
-          yes | sdkmanager --licenses >/dev/null 2>&1 || true
-          sdkmanager "platforms;android-34" "build-tools;34.0.0" >/dev/null 2>&1 || true
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Fix Path + Create Wrapper + Build
+      - name: Find Project Root Directory
+        id: find_project
         shell: bash
         run: |
-          # Tìm thư mục gốc chứa settings.gradle
-          SETTINGS_FILE=$(find . -name "settings.gradle" | head -n 1)
+          # Tìm thư mục chứa settings.gradle hoặc settings.gradle.kts
+          SETTINGS_FILE=$(find . -maxdepth 3 \( -name "settings.gradle" -o -name "settings.gradle.kts" \) | head -n 1)
           if [ -z "$SETTINGS_FILE" ]; then
             echo "❌ Không tìm thấy settings.gradle"
             exit 1
           fi
-          TARGET_DIR=$(dirname "$SETTINGS_FILE")
-          echo "➡️ Project root: $TARGET_DIR"
-          cd "$TARGET_DIR"
+          PROJECT_DIR=$(dirname "$SETTINGS_FILE")
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+          echo "Found project directory at: $PROJECT_DIR"
 
-          # Tạo local.properties
-          echo "sdk.dir=$ANDROID_HOME" > local.properties
-
-          # Tạo Gradle Wrapper 8.4 nếu chưa có
+      - name: Generate Gradle Wrapper (if missing)
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
           if [ ! -f "./gradlew" ]; then
-            echo "→ Đang tạo Gradle Wrapper 8.4..."
+            echo "⚠️️ Không thấy gradlew, đang dùng Gradle cài sẵn để khởi tạo Wrapper 8.4..."
+            # Cài đặt gradle CLI nhanh nếu chưa có
+            sudo apt-get update -qq && sudo apt-get install -y -qq gradle
             gradle wrapper --gradle-version 8.4
           fi
           chmod +x ./gradlew
 
-          # Build
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          build-root-directory: ${{ env.PROJECT_DIR }}
+
+      - name: Build Debug APK
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          # Tự động tạo local.properties
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          
+          # Thực hiện build
           ./gradlew assembleDebug --stacktrace --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: SoThuChi-Debug-APK
-          path: '**/build/outputs/apk/debug/*.apk'
+          path: '${{ env.PROJECT_DIR }}/**/build/outputs/apk/debug/*.apk'
           retention-days: 14
           if-no-files-found: error
