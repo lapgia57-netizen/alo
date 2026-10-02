@@ -1,120 +1,130 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:gravity="center"
-    android:padding="28dp"
-    android:background="#0f172a">
+    android:fillViewport="true"
+    android:background="@color/primary">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Sổ Thu Chi"
-        android:textColor="#ffffff"
-        android:textSize="26sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="4dp" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Quản lý thu chi thông minh"
-        android:textColor="#a5b4fc"
-        android:textSize="13sp"
-        android:layout_marginBottom="32dp" />
-
-    <com.google.android.material.card.MaterialCardView
-        xmlns:app="http://schemas.android.com/apk/res-auto"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:cardCornerRadius="20dp"
-        app:cardBackgroundColor="#1e293b">
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="24dp">
 
-        <LinearLayout
+        <ImageView
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:src="@android:drawable/ic_menu_my_calendar"
+            android:contentDescription="@string/app_name"
+            app:tint="@color/white"
+            android:layout_marginTop="48dp"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/app_name"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:textColor="@color/white"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Quản lý thu chi thông minh"
+            android:textSize="13sp"
+            android:textColor="#C7D2FE"
+            android:layout_marginBottom="32dp" />
+
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="22dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Đăng nhập tài khoản Email"
-                android:textColor="#a5b4fc"
-                android:textSize="11sp"
-                android:textStyle="bold"
-                android:layout_marginBottom="14dp" />
-
-            <EditText
-                android:id="@+id/et_email"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:hint="Email"
-                android:inputType="textEmailAddress"
-                android:textColor="#ffffff"
-                android:textColorHint="#64748b"
-                android:background="@android:drawable/edit_text"
-                android:paddingHorizontal="12dp"
-                android:layout_marginBottom="12dp" />
-
-            <EditText
-                android:id="@+id/et_password"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:hint="Mật khẩu (≥ 6 ký tự)"
-                android:inputType="textPassword"
-                android:textColor="#ffffff"
-                android:textColorHint="#64748b"
-                android:background="@android:drawable/edit_text"
-                android:paddingHorizontal="12dp"
-                android:layout_marginBottom="18dp" />
+            app:cardCornerRadius="20dp"
+            app:cardElevation="8dp"
+            app:cardBackgroundColor="@color/bg_card"
+            android:layout_marginBottom="24dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:weightSum="2">
+                android:orientation="vertical"
+                android:padding="24dp">
 
-                <Button
-                    android:id="@+id/btn_login"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_weight="1"
-                    android:text="Đăng nhập"
-                    android:textAllCaps="false"
-                    android:backgroundTint="#4f46e5"
-                    android:layout_marginEnd="6dp" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Đăng nhập tài khoản"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/primary"
+                    android:letterSpacing="0.05"
+                    android:layout_marginBottom="16dp" />
 
-                <Button
-                    android:id="@+id/btn_register"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_weight="1"
-                    android:text="Đăng ký"
-                    android:textAllCaps="false"
-                    android:backgroundTint="#059669"
-                    android:layout_marginStart="6dp" />
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/email"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    android:layout_marginBottom="12dp">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etEmail"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textEmailAddress"
+                        android:textSize="15sp" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/password"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    app:endIconMode="password_toggle"
+                    android:layout_marginBottom="20dp">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etPassword"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textPassword"
+                        android:textSize="15sp" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnLogin"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:text="@string/login"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    app:cornerRadius="12dp"
+                    android:layout_marginBottom="10dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnRegister"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:text="@string/register"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    app:cornerRadius="12dp"
+                    app:backgroundTint="@color/income_bg"
+                    android:textColor="@color/income" />
+
             </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
-            <ProgressBar
-                android:id="@+id/progress"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:layout_gravity="center"
-                android:layout_marginTop="14dp"
-                android:visibility="gone" />
+        <ProgressBar
+            android:id="@+id/progressBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:indeterminateTint="@color/white" />
 
-            <TextView
-                android:id="@+id/tv_status"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:textColor="#6ee7b7"
-                android:textSize="12sp"
-                android:gravity="center"
-                android:visibility="gone" />
-        </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
-</LinearLayout>
+    </LinearLayout>
+</ScrollView>

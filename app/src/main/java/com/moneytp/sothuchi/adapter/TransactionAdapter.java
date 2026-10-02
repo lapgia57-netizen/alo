@@ -8,102 +8,86 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
-import androidx.recyclerview.widget.DiffUtil;
-import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.moneytp.sothuchi.R;
 import com.moneytp.sothuchi.model.Transaction;
 
 import java.text.NumberFormat;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
-/**
- * Adapter tối ưu với DiffUtil + ListAdapter.
- * Chỉ rebind những item thực sự thay đổi → scroll mượt, không flicker.
- */
-public class TransactionAdapter extends ListAdapter<Transaction, TransactionAdapter.VH> {
+public class TransactionAdapter extends RecyclerView.Adapter<TransactionAdapter.ViewHolder> {
 
     public interface OnItemActionListener {
         void onEdit(Transaction item);
         void onDelete(Transaction item);
     }
 
-    private final boolean isChi;
+    private final List<Transaction> items = new ArrayList<>();
     private final OnItemActionListener listener;
     private final NumberFormat currencyFormat;
 
-    public TransactionAdapter(boolean isChi, OnItemActionListener listener) {
-        super(DIFF_CALLBACK);
-        this.isChi = isChi;
+    public TransactionAdapter(OnItemActionListener listener) {
         this.listener = listener;
         this.currencyFormat = NumberFormat.getNumberInstance(new Locale("vi", "VN"));
     }
 
-    private static final DiffUtil.ItemCallback<Transaction> DIFF_CALLBACK =
-            new DiffUtil.ItemCallback<Transaction>() {
-                @Override
-                public boolean areItemsTheSame(@NonNull Transaction oldItem, @NonNull Transaction newItem) {
-                    return oldItem.getKey() != null && oldItem.getKey().equals(newItem.getKey());
-                }
-
-                @Override
-                public boolean areContentsTheSame(@NonNull Transaction oldItem, @NonNull Transaction newItem) {
-                    return oldItem.equals(newItem);
-                }
-            };
+    public void setData(List<Transaction> data) {
+        items.clear();
+        if (data != null) items.addAll(data);
+        notifyDataSetChanged();
+    }
 
     @NonNull
     @Override
-    public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View v = LayoutInflater.from(parent.getContext())
+    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View view = LayoutInflater.from(parent.getContext())
                 .inflate(R.layout.item_transaction, parent, false);
-        return new VH(v);
+        return new ViewHolder(view);
     }
 
     @Override
-    public void onBindViewHolder(@NonNull VH holder, int position) {
-        Transaction t = getItem(position);
-        holder.bind(t);
+    public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+        Transaction item = items.get(position);
+        holder.tvCategory.setText(item.getDanh_muc() != null ? item.getDanh_muc() : "");
+        holder.tvDescription.setText(item.getMo_ta() != null ? item.getMo_ta() : "");
+        holder.tvDate.setText(item.getNgay() != null ? item.getNgay() : "");
+
+        String prefix = item.isExpense() ? "-" : "+";
+        String amountStr = prefix + currencyFormat.format(item.getSo_tien()) + " đ";
+        holder.tvAmount.setText(amountStr);
+
+        int color = ContextCompat.getColor(holder.itemView.getContext(),
+                item.isExpense() ? R.color.expense : R.color.income);
+        holder.tvAmount.setTextColor(color);
+
+        holder.btnEdit.setOnClickListener(v -> {
+            if (listener != null) listener.onEdit(item);
+        });
+        holder.btnDelete.setOnClickListener(v -> {
+            if (listener != null) listener.onDelete(item);
+        });
     }
 
-    class VH extends RecyclerView.ViewHolder {
-        TextView tvCategory, tvDesc, tvAmount, tvDate, tvNote;
+    @Override
+    public int getItemCount() {
+        return items.size();
+    }
+
+    static class ViewHolder extends RecyclerView.ViewHolder {
+        TextView tvCategory, tvDescription, tvDate, tvAmount;
         ImageButton btnEdit, btnDelete;
 
-        VH(@NonNull View itemView) {
+        ViewHolder(@NonNull View itemView) {
             super(itemView);
-            tvCategory = itemView.findViewById(R.id.tv_category);
-            tvDesc = itemView.findViewById(R.id.tv_desc);
-            tvAmount = itemView.findViewById(R.id.tv_amount);
-            tvDate = itemView.findViewById(R.id.tv_date);
-            tvNote = itemView.findViewById(R.id.tv_note);
-            btnEdit = itemView.findViewById(R.id.btn_edit);
-            btnDelete = itemView.findViewById(R.id.btn_delete);
-        }
-
-        void bind(Transaction t) {
-            tvCategory.setText(t.getDanhMuc() != null ? t.getDanhMuc() : "—");
-            tvDesc.setText(t.getMoTa() != null ? t.getMoTa() : "");
-            tvDate.setText(t.getNgay() != null ? t.getNgay() : "");
-            String amountStr = currencyFormat.format(t.getSoTien()) + " đ";
-            tvAmount.setText(amountStr);
-            tvAmount.setTextColor(ContextCompat.getColor(itemView.getContext(),
-                    isChi ? R.color.rose_600 : R.color.emerald_600));
-
-            if (t.getGhiChu() != null && !t.getGhiChu().isEmpty()) {
-                tvNote.setVisibility(View.VISIBLE);
-                tvNote.setText(t.getGhiChu());
-            } else {
-                tvNote.setVisibility(View.GONE);
-            }
-
-            btnEdit.setOnClickListener(v -> {
-                if (listener != null) listener.onEdit(t);
-            });
-            btnDelete.setOnClickListener(v -> {
-                if (listener != null) listener.onDelete(t);
-            });
+            tvCategory = itemView.findViewById(R.id.tvCategory);
+            tvDescription = itemView.findViewById(R.id.tvDescription);
+            tvDate = itemView.findViewById(R.id.tvDate);
+            tvAmount = itemView.findViewById(R.id.tvAmount);
+            btnEdit = itemView.findViewById(R.id.btnEdit);
+            btnDelete = itemView.findViewById(R.id.btnDelete);
         }
     }
 }

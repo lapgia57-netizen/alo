@@ -1,93 +1,94 @@
-# Sổ Thu Chi – Phiên bản Java (Android Native)
+# Sổ Thu Chi – Android Native (Java)
 
-Chuyển đổi hoàn toàn từ bản web Capacitor (HTML + Firebase JS) sang **Android Native Java**.
+Ứng dụng quản lý thu chi cá nhân viết bằng **Java**, sử dụng **Firebase Auth + Realtime Database**.
 
-## Tính năng chính
+## Tính năng
 
 - Đăng nhập / Đăng ký bằng Email + Password (Firebase Auth)
-- Ghi nhận **Chi tiêu** và **Thu nhập** realtime
-- Hiển thị danh sách với **RecyclerView + DiffUtil** (cực nhanh, không flicker)
-- Tính tổng Thu / Chi / Số dư realtime
-- **Màn hình Biểu đồ phân tích**:
-  - PieChart cơ cấu chi tiêu theo danh mục
-  - PieChart cơ cấu thu nhập theo danh mục
-  - BarChart so sánh Thu vs Chi theo tháng
-- Thêm / Sửa / Xóa chứng từ
-- Offline persistence của Firebase
+- Ghi nhận **Chi tiêu** và **Thu nhập**
+- Thêm / Sửa / Xóa giao dịch (realtime)
+- Tính tổng thu, tổng chi, số dư
+- **Biểu đồ**:
+  - Pie chart chi tiêu theo danh mục
+  - Pie chart thu nhập theo danh mục
+  - Bar chart thu/chi theo tháng
+- Giao diện **màu sáng** (light theme) tối ưu hiển thị dữ liệu
 
-## Thuật toán tối ưu tốc độ Load & Hiển thị
-
-### 1. Data Loading (DataRepository)
-
-| Kỹ thuật | Mô tả | Lợi ích |
-|----------|-------|---------|
-| `ConcurrentHashMap` cache | Giữ toàn bộ data trong memory | Truy cập O(1), không query lại |
-| Single `ValueEventListener` | Chỉ 1 listener cho mỗi node | Tránh memory leak + duplicate callback |
-| Background parse + sort | `ExecutorService` + `Handler` | UI thread không bị block |
-| `keepSynced(true)` | Firebase giữ data disk + memory | Load lần sau gần như tức thì |
-| Pre-computed aggregates | Tính tổng + category + tháng sẵn | Biểu đồ mở ra không cần tính lại |
-
-### 2. Hiển thị danh sách (TransactionAdapter)
-
-| Kỹ thuật | Mô tả | Lợi ích |
-|----------|-------|---------|
-| `ListAdapter` + `DiffUtil` | Chỉ cập nhật item thay đổi | Scroll siêu mượt, không rebind toàn bộ |
-| `setHasFixedSize(true)` | RecyclerView biết size cố định | Giảm measure/layout |
-| `setItemViewCacheSize(20)` | Cache nhiều ViewHolder | Scroll nhanh khi data nhiều |
-| `content-visibility` style | Contain layout | Giảm overdraw |
-
-### 3. Biểu đồ (ChartActivity)
-
-- Dữ liệu đã được aggregate sẵn trong `DataRepository.ChartData`
-- Chỉ cần convert Map → Entry list và gọi `setData()`
-- Animation Y 700-800ms mượt
-
-## Cấu trúc dự án
+## Cấu trúc dữ liệu Firebase (giữ nguyên từ app gốc)
 
 ```
-SoThuChiJava/
-├── app/
-│   ├── src/main/
-│   │   ├── java/com/moneytp/sothuchi/
-│   │   │   ├── model/Transaction.java
-│   │   │   ├── util/DataRepository.java      ← Thuật toán load nhanh
-│   │   │   ├── adapter/TransactionAdapter.java ← DiffUtil
-│   │   │   └── ui/
-│   │   │       ├── LoginActivity.java
-│   │   │       ├── MainActivity.java
-│   │   │       ├── AddEditActivity.java
-│   │   │       └── ChartActivity.java         ← Biểu đồ phân tích
-│   │   ├── res/layout/...
-│   │   └── AndroidManifest.xml
-│   └── build.gradle
-├── build.gradle
-└── settings.gradle
+users/
+  {uid}/
+    chi-tieu/
+      {pushId}/
+        danh_muc: string
+        mo_ta: string
+        ngay: "YYYY-MM-DD"
+        so_tien: number
+        ghi_chu: string | null
+        thoi_gian: number (timestamp)
+    thu-nhap/
+      {pushId}/
+        ... (cùng cấu trúc)
 ```
 
-## Cách build & chạy
+## Cách build APK
 
-1. Mở Android Studio → **Open** thư mục `SoThuChiJava`
-2. Thêm file `google-services.json` vào `app/` (lấy từ Firebase Console project `tienbothi`)
-3. Sync Gradle
-4. Chạy trên emulator hoặc thiết bị thật (minSdk 24)
+### 1. Chuẩn bị Firebase
 
-### Dependency quan trọng
+1. Vào [Firebase Console](https://console.firebase.google.com/) → project **tienbothi**
+2. Thêm app **Android** với package name: `com.moneytp.sothuchi`
+3. Tải file `google-services.json` thật và **thay thế** file trong thư mục `app/`
+4. Bật **Email/Password** Authentication
+5. Realtime Database rules nên cho phép user chỉ đọc/ghi data của chính mình:
 
-- Firebase BOM 32.7.0
-- MPAndroidChart (JitPack)
-- Material Components + ViewPager2 + Lifecycle LiveData
+```json
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    }
+  }
+}
+```
 
-## So sánh với bản Web cũ
+### 2. Mở project bằng Android Studio
 
-| Tiêu chí | Bản Web (Capacitor) | Bản Java Native |
-|----------|---------------------|-----------------|
-| Render list | innerHTML + DocumentFragment | RecyclerView + DiffUtil |
-| Load data | JS object + sort mỗi lần | Background thread + ConcurrentHashMap |
-| Biểu đồ | Không có | Pie + Bar đầy đủ |
-| Offline | Firebase JS | Firebase + keepSynced |
-| Hiệu năng | Phụ thuộc WebView | Native GPU + memory managed |
+1. Mở Android Studio → **Open** → chọn thư mục `SoThuChiJava`
+2. Chờ Gradle sync xong
+3. Kết nối máy Android hoặc dùng Emulator
+4. Bấm **Run** (▶) để chạy
 
----
+### 3. Build APK Release
 
-**Tác giả chuyển đổi**: Grok (xAI)  
-**Nguồn gốc**: alo-main (Capacitor web app)
+```bash
+cd SoThuChiJava
+./gradlew assembleRelease
+```
+
+File APK nằm tại:
+```
+app/build/outputs/apk/release/app-release-unsigned.apk
+```
+
+(Ký APK bằng keystore của bạn trước khi phân phối.)
+
+## Thư viện sử dụng
+
+- Firebase Auth + Realtime Database
+- Material Components 3
+- MPAndroidChart (biểu đồ)
+- AndroidX (AppCompat, RecyclerView, ViewPager2, …)
+
+## Package
+
+`com.moneytp.sothuchi`
+
+## Ghi chú
+
+- Code giữ nguyên 100% logic đọc/ghi Firebase của app Capacitor gốc.
+- Giao diện chuyển sang light theme để dữ liệu dễ đọc hơn.
+- Biểu đồ tự cập nhật realtime khi có thay đổi dữ liệu.

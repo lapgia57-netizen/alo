@@ -1,4 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Sổ Thu Chi</string>
+    <string name="login">Đăng nhập</string>
+    <string name="register">Đăng ký</string>
+    <string name="email">Email</string>
+    <string name="password">Mật khẩu</string>
+    <string name="logout">Đăng xuất</string>
+    <string name="chi_tieu">Chi tiêu</string>
+    <string name="thu_nhap">Thu nhập</string>
+    <string name="bieu_do">Biểu đồ</string>
+    <string name="them">Thêm</string>
+    <string name="sua">Sửa</string>
+    <string name="xoa">Xóa</string>
+    <string name="luu">Lưu</string>
+    <string name="huy">Hủy</string>
+    <string name="danh_muc">Danh mục</string>
+    <string name="mo_ta">Mô tả</string>
+    <string name="so_tien">Số tiền</string>
+    <string name="ngay">Ngày</string>
+    <string name="ghi_chu">Ghi chú</string>
+    <string name="tong_thu">Tổng thu</string>
+    <string name="tong_chi">Tổng chi</string>
+    <string name="so_du">Số dư</string>
+    <string name="chua_co_du_lieu">Chưa có dữ liệu</string>
+    <string name="xac_nhan_xoa">Bạn có chắc muốn xóa giao dịch này?</string>
+    <string name="dang_nhap_thanh_cong">Đăng nhập thành công</string>
+    <string name="loi">Lỗi</string>
 </resources>

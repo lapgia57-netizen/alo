@@ -1,19 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.SoThuChi" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
-        <item name="colorPrimary">#4f46e5</item>
-        <item name="colorPrimaryVariant">#1e1b4b</item>
-        <item name="colorOnPrimary">@android:color/white</item>
-        <item name="colorSecondary">#059669</item>
-        <item name="colorOnSecondary">@android:color/white</item>
-        <item name="android:statusBarColor">#1e1b4b</item>
+    <style name="Theme.SoThuChi" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryDark">@color/primary_dark</item>
+        <item name="colorAccent">@color/accent</item>
+        <item name="android:statusBarColor">@color/bg_main</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">@color/bg_main</item>
+        <item name="android:windowBackground">@color/bg_main</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
     </style>
 
-    <style name="Theme.SoThuChi.NoActionBar" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <item name="colorPrimary">#4f46e5</item>
-        <item name="colorPrimaryVariant">#1e1b4b</item>
-        <item name="colorOnPrimary">@android:color/white</item>
-        <item name="android:statusBarColor">#0f172a</item>
-        <item name="android:windowBackground">#0f172a</item>
+    <style name="Theme.SoThuChi.Login" parent="Theme.SoThuChi">
+        <item name="android:statusBarColor">@color/primary</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">@color/primary_dark</item>
+    </style>
+
+    <style name="CardStyle">
+        <item name="android:layout_margin">8dp</item>
+        <item name="cardCornerRadius">16dp</item>
+        <item name="cardElevation">2dp</item>
+        <item name="cardBackgroundColor">@color/bg_card</item>
+    </style>
+
+    <style name="InputStyle" parent="Widget.Material3.TextInputLayout.OutlinedBox">
+        <item name="boxBackgroundColor">@color/bg_input</item>
+        <item name="boxStrokeColor">@color/primary</item>
+        <item name="hintTextColor">@color/text_secondary</item>
     </style>
 </resources>

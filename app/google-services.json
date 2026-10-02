@@ -1,13 +1,14 @@
 {
   "project_info": {
     "project_number": "353470247741",
+    "firebase_url": "https://tienbothi-default-rtdb.firebaseio.com",
     "project_id": "tienbothi",
     "storage_bucket": "tienbothi.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:353470247741:android:dummy123456",
+        "mobilesdk_app_id": "1:353470247741:android:placeholder",
         "android_client_info": {
           "package_name": "com.moneytp.sothuchi"
         }

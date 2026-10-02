@@ -4,150 +4,201 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#f8fafc">
+    android:background="@color/bg_main">
 
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#1e1b4b"
-        android:theme="@style/ThemeOverlay.MaterialComponents.Dark.ActionBar">
+        android:background="@color/bg_header"
+        app:elevation="0dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:paddingHorizontal="16dp"
+            android:paddingTop="12dp"
+            android:paddingBottom="8dp">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Sổ Thu Chi"
-                android:textColor="#ffffff"
-                android:textSize="20sp"
-                android:textStyle="bold" />
-
+            <!-- Header: user + logout -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
                 android:orientation="horizontal"
-                android:weightSum="3">
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
 
-                <LinearLayout
+                <TextView
+                    android:id="@+id/tvUserEmail"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:gravity="center">
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="TỔNG THU"
-                        android:textColor="#a5b4fc"
-                        android:textSize="10sp"
-                        android:textStyle="bold" />
-                    <TextView
-                        android:id="@+id/tv_total_thu"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0 đ"
-                        android:textColor="#6ee7b7"
-                        android:textSize="13sp"
-                        android:textStyle="bold"
-                        android:maxLines="1"
-                        android:ellipsize="end" />
-                </LinearLayout>
+                    android:textSize="13sp"
+                    android:textColor="@color/text_secondary"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
 
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:gravity="center">
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="TỔNG CHI"
-                        android:textColor="#a5b4fc"
-                        android:textSize="10sp"
-                        android:textStyle="bold" />
-                    <TextView
-                        android:id="@+id/tv_total_chi"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0 đ"
-                        android:textColor="#fda4af"
-                        android:textSize="13sp"
-                        android:textStyle="bold"
-                        android:maxLines="1"
-                        android:ellipsize="end" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:gravity="center">
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="SỐ DƯ"
-                        android:textColor="#a5b4fc"
-                        android:textSize="10sp"
-                        android:textStyle="bold" />
-                    <TextView
-                        android:id="@+id/tv_balance"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0 đ"
-                        android:textColor="#ffffff"
-                        android:textSize="13sp"
-                        android:textStyle="bold"
-                        android:maxLines="1"
-                        android:ellipsize="end" />
-                </LinearLayout>
+                <ImageButton
+                    android:id="@+id/btnLogout"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:src="@android:drawable/ic_lock_power_off"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/logout"
+                    app:tint="@color/text_secondary" />
             </LinearLayout>
+
+            <!-- Balance cards -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    app:cardCornerRadius="14dp"
+                    app:cardElevation="0dp"
+                    app:cardBackgroundColor="@color/income_bg"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="#A7F3D0"
+                    android:layout_marginEnd="6dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="12dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/tong_thu"
+                            android:textSize="11sp"
+                            android:textColor="@color/income" />
+
+                        <TextView
+                            android:id="@+id/tvTotalIncome"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0 đ"
+                            android:textSize="15sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/income"
+                            android:layout_marginTop="2dp" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    app:cardCornerRadius="14dp"
+                    app:cardElevation="0dp"
+                    app:cardBackgroundColor="@color/expense_bg"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="#FECDD3"
+                    android:layout_marginStart="6dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="12dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/tong_chi"
+                            android:textSize="11sp"
+                            android:textColor="@color/expense" />
+
+                        <TextView
+                            android:id="@+id/tvTotalExpense"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0 đ"
+                            android:textSize="15sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/expense"
+                            android:layout_marginTop="2dp" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+            </LinearLayout>
+
+            <!-- Balance -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="0dp"
+                app:cardBackgroundColor="@color/primary_light"
+                app:strokeWidth="1dp"
+                app:strokeColor="#C7D2FE"
+                android:layout_marginBottom="4dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:padding="12dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/so_du"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/primary" />
+
+                    <TextView
+                        android:id="@+id/tvBalance"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0 đ"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/primary" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
         </LinearLayout>
 
         <com.google.android.material.tabs.TabLayout
-            android:id="@+id/tab_layout"
+            android:id="@+id/tabLayout"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="#1e1b4b"
-            app:tabTextColor="#a5b4fc"
-            app:tabSelectedTextColor="#ffffff"
-            app:tabIndicatorColor="#818cf8"
+            android:layout_height="48dp"
+            android:background="@color/bg_header"
             app:tabMode="fixed"
-            app:tabGravity="fill" />
+            app:tabGravity="fill"
+            app:tabIndicatorColor="@color/primary"
+            app:tabSelectedTextColor="@color/primary"
+            app:tabTextColor="@color/text_secondary"
+            app:tabIndicatorFullWidth="false"
+            app:tabIndicatorHeight="3dp" />
+
     </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.viewpager2.widget.ViewPager2
-        android:id="@+id/view_pager"
+        android:id="@+id/viewPager"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         app:layout_behavior="@string/appbar_scrolling_view_behavior" />
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fab_chart"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|start"
-        android:layout_margin="20dp"
-        android:src="@android:drawable/ic_menu_sort_by_size"
-        android:contentDescription="Biểu đồ"
-        app:backgroundTint="#4f46e5"
-        app:tint="#ffffff" />
-
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fab_add"
+        android:id="@+id/fabAdd"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
         android:layout_margin="20dp"
         android:src="@android:drawable/ic_input_add"
-        android:contentDescription="Thêm"
-        app:backgroundTint="#4f46e5"
-        app:tint="#ffffff" />
+        android:contentDescription="@string/them"
+        app:backgroundTint="@color/primary"
+        app:tint="@color/white"
+        app:elevation="6dp" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
