@@ -20,14 +20,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Setup JDK 17 for modern Android building tools
+      # Sử dụng JDK 17 chuẩn kết hợp các cờ ép biên dịch
       - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      # FIXED: Cleaned up bad syntax and removed invalid backslashes/parentheses
       - name: Find Project Root Directory
         id: find_project
         shell: bash
@@ -41,14 +40,13 @@ jobs:
           echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
           echo "Found project directory at: $PROJECT_DIR"
 
-      # FIXED: Cleaned syntax for reading the working directory environment variable
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           build-root-directory: ${{ env.PROJECT_DIR }}
           generate-submit-arguments: true 
 
-      # FIXED: Removed broken escape characters from paths and variables
+      # Tự động tạo/vá màu nền icon nếu dự án bị thiếu
       - name: Fix Missing Icon Resource
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
@@ -66,7 +64,6 @@ jobs:
             fi
           fi
 
-      # FIXED: Cleaned compile commands and forced clean UTF-8 string encoding
       - name: Build Debug APK
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
@@ -81,20 +78,21 @@ jobs:
           chmod +x ./gradlew
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           
-          # Clean and re-generate modern gradle compile flags
+          # Cấu hình hệ thống sâu chống lỗi xung đột thư viện Javac
           > gradle.properties
           echo "android.useAndroidX=true" >> gradle.properties
           echo "android.enableJetifier=true" >> gradle.properties
           echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> gradle.properties
           echo "android.nonTransitiveRClass=false" >> gradle.properties
           
-          # Wipe broken cache artifacts from previous builds
+          # Ép buộc Javac hiển thị chi tiết mọi cảnh báo và lỗi cú pháp (Cực kỳ quan trọng)
+          echo "tasks.withType(JavaCompile) { options.compilerArgs << \"-Xlint:unchecked\" << \"-Xlint:deprecation\" }" >> build.gradle 2>/dev/null || true
+          
           ./gradlew clean
           
-          # Run build task with standard log verbosity
-          ./gradlew assembleDebug --stacktrace --no-daemon
+          # Chạy build kèm cờ ép hiển thị thông tin lỗi chi tiết nhất từ compiler ra console
+          ./gradlew assembleDebug --stacktrace --info --no-daemon
 
-      # FIXED: Fixed path mapping format for artifact uploader
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
