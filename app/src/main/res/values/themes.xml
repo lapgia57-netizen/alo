@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.SoThuChi" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+        <item name="colorPrimary">#4f46e5</item>
+        <item name="colorPrimaryVariant">#1e1b4b</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="colorSecondary">#059669</item>
+        <item name="colorOnSecondary">@android:color/white</item>
+        <item name="android:statusBarColor">#1e1b4b</item>
+    </style>
+
+    <style name="Theme.SoThuChi.NoActionBar" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#4f46e5</item>
+        <item name="colorPrimaryVariant">#1e1b4b</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="android:statusBarColor">#0f172a</item>
+        <item name="android:windowBackground">#0f172a</item>
+    </style>
+</resources>

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "353470247741",
+    "project_id": "tienbothi",
+    "storage_bucket": "tienbothi.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:353470247741:android:dummy123456",
+        "android_client_info": {
+          "package_name": "com.moneytp.sothuchi"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBIIWxW_jTP1BpGOaIa9atr_sFhRlz3fJ0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
