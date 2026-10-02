@@ -1,38 +1,111 @@
-name: Build Android APK
+name: Build SoThuChi APK
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
+    name: Build Android APK
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
-      - name: Checkout Code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      # Thiết lập JDK 17 chuẩn hóa cho cả hệ thống biên dịch
+      - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      - name: Find Project Root Directory
+        id: find_project
+        shell: bash
+        run: |
+          SETTINGS_FILE=$(find . -maxdepth 3 \( -name "settings.gradle" -o -name "settings.gradle.kts" \) | head -n 1)
+          if [ -z "$SETTINGS_FILE" ]; then
+            echo "❌ Không tìm thấy settings.gradle trong repository!"
+            exit 1
+          fi
+          PROJECT_DIR=$(dirname "$SETTINGS_FILE")
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+          echo "Found project directory at: $PROJECT_DIR"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          build-root-directory: ${{ env.PROJECT_DIR }}
+          generate-submit-arguments: true 
 
-      # Build the Debug APK
+      # Tự động chèn màu background bị thiếu nếu file colors.xml trống
+      - name: Fix Missing Icon Resource
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          COLORS_FILE="app/src/main/res/values/colors.xml"
+          if [ ! -f "$COLORS_FILE" ]; then
+            mkdir -p "app/src/main/res/values"
+            echo '<?xml version="1.0" encoding="utf-8"?>' > "$COLORS_FILE"
+            echo '<resources>' >> "$COLORS_FILE"
+            echo '    <color name="ic_launcher_background">#FFFFFF</color>' >> "$COLORS_FILE"
+            echo '</resources>' >> "$COLORS_FILE"
+          else
+            if ! grep -q "ic_launcher_background" "$COLORS_FILE"; then
+              sed -i 's|</resources>|    <color name="ic_launcher_background">#FFFFFF</color>\n</resources>|' "$COLORS_FILE"
+            fi
+          fi
+
       - name: Build Debug APK
-        run: ./gradlew assembleDebug
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        # Thiết lập biến hệ thống UTF-8 để Javac đọc hiểu các comment tiếng Việt / ký tự lạ không bị lỗi
+        env:
+          JAVA_TOOL_OPTIONS: "-Dfile.encoding=UTF-8"
+        run: |
+          if [ ! -f "./gradlew" ]; then
+            echo "⚠️ Không tìm thấy ./gradlew, đang khởi tạo nhanh Gradle Wrapper..."
+            gradle wrapper --gradle-version 8.4
+          fi
+          
+          chmod +x ./gradlew
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          
+          # TỰ ĐỘNG LÀM SẠCH VÀ RE-CONFIG HỆ THỐNG GRADLE PROPERTIES
+          > gradle.properties
+          echo "android.useAndroidX=true" >> gradle.properties
+          echo "android.enableJetifier=true" >> gradle.properties
+          echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> gradle.properties
+          echo "android.nonTransitiveRClass=false" >> gradle.properties
+          
+          # Ép xóa cache bị lỗi cũ trước khi chạy Javac
+          ./gradlew clean
+          
+          # ÉP GRADLE VÀ JAVAC IN BẰNG SẠCH TẤT CẢ LỖI CÚ PHÁP RA CONSOLE (XỬ LÝ TRIỆT ĐỂ LỖI GIẤU LOG)
+          ./gradlew assembleDebug --info --stacktrace --no-daemon \
+            -Pandroid.useFallbackCompilerArgs=true \
+            -Dorg.gradle.logging.level=lifecycle || {
+             echo "=========================================================================="
+             echo "❌ PHÁT HIỆN LỖI TRONG CODE LOGIC! ĐANG DUMP CHI TIẾT FILE BỊ LỖI RA TERMINAL..."
+             echo "=========================================================================="
+             # Tìm kiếm sâu các file lỗi compile bị Gradle ẩn trong bộ nhớ để in đè ra console công khai
+             find . -name "compile*Output.txt" -exec cat {} \; 2>/dev/null || true
+             find app/build/reports/ -name "*.html" -exec head -n 100 {} \; 2>/dev/null || true
+             exit 1
+          }
 
-      # Upload the APK file so you can download it from GitHub
-      - name: Upload APK Artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: SoThuChi-Debug-APK
+          path: '${{ env.PROJECT_DIR }}/**/build/outputs/apk/debug/*.apk'
+          retention-days: 14
+          if-no-files-found: error
