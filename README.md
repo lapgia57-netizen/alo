@@ -1,106 +1,93 @@
-# Sổ Thu Chi Cá Nhân – Capacitor (Android + iOS)
+# Sổ Thu Chi – Phiên bản Java (Android Native)
 
-Ứng dụng quản lý thu chi cá nhân chạy trên **Android (APK)** và **iPhone (IPA)**.
+Chuyển đổi hoàn toàn từ bản web Capacitor (HTML + Firebase JS) sang **Android Native Java**.
 
-- Giữ nguyên 100% cấu hình Firebase
-- Giao diện tối ưu Oscal Tiger 12 + iPhone
-- Đã tối ưu hiệu năng Capacitor
+## Tính năng chính
+
+- Đăng nhập / Đăng ký bằng Email + Password (Firebase Auth)
+- Ghi nhận **Chi tiêu** và **Thu nhập** realtime
+- Hiển thị danh sách với **RecyclerView + DiffUtil** (cực nhanh, không flicker)
+- Tính tổng Thu / Chi / Số dư realtime
+- **Màn hình Biểu đồ phân tích**:
+  - PieChart cơ cấu chi tiêu theo danh mục
+  - PieChart cơ cấu thu nhập theo danh mục
+  - BarChart so sánh Thu vs Chi theo tháng
+- Thêm / Sửa / Xóa chứng từ
+- Offline persistence của Firebase
+
+## Thuật toán tối ưu tốc độ Load & Hiển thị
+
+### 1. Data Loading (DataRepository)
+
+| Kỹ thuật | Mô tả | Lợi ích |
+|----------|-------|---------|
+| `ConcurrentHashMap` cache | Giữ toàn bộ data trong memory | Truy cập O(1), không query lại |
+| Single `ValueEventListener` | Chỉ 1 listener cho mỗi node | Tránh memory leak + duplicate callback |
+| Background parse + sort | `ExecutorService` + `Handler` | UI thread không bị block |
+| `keepSynced(true)` | Firebase giữ data disk + memory | Load lần sau gần như tức thì |
+| Pre-computed aggregates | Tính tổng + category + tháng sẵn | Biểu đồ mở ra không cần tính lại |
+
+### 2. Hiển thị danh sách (TransactionAdapter)
+
+| Kỹ thuật | Mô tả | Lợi ích |
+|----------|-------|---------|
+| `ListAdapter` + `DiffUtil` | Chỉ cập nhật item thay đổi | Scroll siêu mượt, không rebind toàn bộ |
+| `setHasFixedSize(true)` | RecyclerView biết size cố định | Giảm measure/layout |
+| `setItemViewCacheSize(20)` | Cache nhiều ViewHolder | Scroll nhanh khi data nhiều |
+| `content-visibility` style | Contain layout | Giảm overdraw |
+
+### 3. Biểu đồ (ChartActivity)
+
+- Dữ liệu đã được aggregate sẵn trong `DataRepository.ChartData`
+- Chỉ cần convert Map → Entry list và gọi `setData()`
+- Animation Y 700-800ms mượt
 
 ## Cấu trúc dự án
 
 ```
-money-tp-everywhere/
-├── www/index.html              ← Web app gốc (Firebase)
-├── package.json
-├── capacitor.config.json
-├── .gitignore
-└── .github/workflows/
-    ├── build-android.yml       ← Build APK
-    └── build-ios.yml           ← Build iOS (Simulator + hướng dẫn IPA)
+SoThuChiJava/
+├── app/
+│   ├── src/main/
+│   │   ├── java/com/moneytp/sothuchi/
+│   │   │   ├── model/Transaction.java
+│   │   │   ├── util/DataRepository.java      ← Thuật toán load nhanh
+│   │   │   ├── adapter/TransactionAdapter.java ← DiffUtil
+│   │   │   └── ui/
+│   │   │       ├── LoginActivity.java
+│   │   │       ├── MainActivity.java
+│   │   │       ├── AddEditActivity.java
+│   │   │       └── ChartActivity.java         ← Biểu đồ phân tích
+│   │   ├── res/layout/...
+│   │   └── AndroidManifest.xml
+│   └── build.gradle
+├── build.gradle
+└── settings.gradle
 ```
 
-## 1. Build Android APK (dễ nhất)
+## Cách build & chạy
 
-1. Tạo repository GitHub → upload toàn bộ thư mục này
-2. Vào **Actions** → **Build Android APK** → **Run workflow**
-3. Tải artifact `so-thu-chi-android` → file `.apk`
-4. Cài trên Android (bật "Nguồn không xác định")
+1. Mở Android Studio → **Open** thư mục `SoThuChiJava`
+2. Thêm file `google-services.json` vào `app/` (lấy từ Firebase Console project `tienbothi`)
+3. Sync Gradle
+4. Chạy trên emulator hoặc thiết bị thật (minSdk 24)
 
-## 2. Build iOS cho iPhone
+### Dependency quan trọng
 
-### A. Bản Simulator (không cần Apple Developer – chạy trên máy Mac / Simulator)
+- Firebase BOM 32.7.0
+- MPAndroidChart (JitPack)
+- Material Components + ViewPager2 + Lifecycle LiveData
 
-- Workflow **Build iOS IPA** sẽ tự build bản Simulator
-- Tải artifact `so-thu-chi-ios-simulator`
-- Mở bằng Xcode Simulator trên Mac
+## So sánh với bản Web cũ
 
-### B. Bản IPA thật cài lên iPhone (cần Apple Developer)
+| Tiêu chí | Bản Web (Capacitor) | Bản Java Native |
+|----------|---------------------|-----------------|
+| Render list | innerHTML + DocumentFragment | RecyclerView + DiffUtil |
+| Load data | JS object + sort mỗi lần | Background thread + ConcurrentHashMap |
+| Biểu đồ | Không có | Pie + Bar đầy đủ |
+| Offline | Firebase JS | Firebase + keepSynced |
+| Hiệu năng | Phụ thuộc WebView | Native GPU + memory managed |
 
-Để build IPA cài được trên iPhone thật bạn cần:
+---
 
-1. Tài khoản **Apple Developer** (99 USD/năm)
-2. Tạo App ID: `com.moneytp.everywhere`
-3. Tạo Certificate + Provisioning Profile (Ad Hoc hoặc Development)
-4. Thêm secrets vào GitHub repository:
-
-| Secret name                  | Mô tả                                      |
-|-----------------------------|--------------------------------------------|
-| `IOS_CERTIFICATE_BASE64`    | File .p12 encode base64                    |
-| `IOS_CERTIFICATE_PASSWORD`  | Mật khẩu file .p12                         |
-| `APPSTORE_ISSUER_ID`        | Issuer ID từ App Store Connect API         |
-| `APPSTORE_KEY_ID`           | Key ID                                     |
-| `APPSTORE_PRIVATE_KEY`      | Nội dung file .p8                          |
-
-Sau đó bỏ comment phần "Build IPA (Release)" trong file  
-`.github/workflows/build-ios.yml` rồi chạy lại workflow.
-
-### C. Cách nhanh nhất trên máy Mac (khuyến nghị nếu có Mac)
-
-```bash
-npm install
-npx cap add ios
-npx cap sync ios
-npx cap open ios
-```
-
-Trong Xcode:
-- Chọn team Apple Developer của bạn
-- Chọn máy iPhone thật → Build & Run
-- Hoặc Archive → Distribute App → Ad Hoc / Development để lấy file `.ipa`
-
-## Cài đặt local đầy đủ
-
-```bash
-# Cài dependency
-npm install
-
-# Thêm 2 nền tảng
-npx cap add android
-npx cap add ios
-
-# Đồng bộ web assets
-npx cap sync
-
-# Mở Android Studio / Xcode
-npx cap open android
-npx cap open ios
-```
-
-## Thông tin app
-
-| Mục              | Giá trị                    |
-|------------------|----------------------------|
-| Package / Bundle | `com.moneytp.everywhere`   |
-| App name         | Sổ Thu Chi                 |
-| Min Android      | API 22 (Android 5.1+)      |
-| Min iOS          | iOS 13+                    |
-| Capacitor        | 6.2.x                      |
-| Firebase         | Giữ nguyên config gốc      |
-
-## Lưu ý quan trọng về iOS
-
-- **Không thể** build IPA cài được lên iPhone thật chỉ với GitHub Actions miễn phí nếu không có chứng chỉ Apple.
-- Bản Simulator chỉ chạy trên Simulator của Mac.
-- Cách thực tế nhất: dùng Mac + Xcode + tài khoản Apple Developer để Archive ra IPA, hoặc dùng TestFlight.
-
-Nếu bạn cần hướng dẫn chi tiết tạo certificate + provisioning profile, bảo mình.
+**Tác giả chuyển đổi**: Grok (xAI)  
+**Nguồn gốc**: alo-main (Capacitor web app)

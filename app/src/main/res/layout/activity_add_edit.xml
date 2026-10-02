@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#f8fafc"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Danh mục"
+            android:textSize="12sp"
+            android:textColor="#64748b"
+            android:textStyle="bold" />
+        <EditText
+            android:id="@+id/et_danh_muc"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:hint="Ví dụ: Ăn uống, Lương..."
+            android:inputType="text"
+            android:maxLength="100"
+            android:layout_marginBottom="14dp"
+            android:background="@android:drawable/edit_text"
+            android:paddingHorizontal="12dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Nội dung diễn giải"
+            android:textSize="12sp"
+            android:textColor="#64748b"
+            android:textStyle="bold" />
+        <EditText
+            android:id="@+id/et_mo_ta"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:hint="Ghi chú chi tiết..."
+            android:inputType="text"
+            android:maxLength="300"
+            android:layout_marginBottom="14dp"
+            android:background="@android:drawable/edit_text"
+            android:paddingHorizontal="12dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Ngày chứng từ (yyyy-MM-dd)"
+            android:textSize="12sp"
+            android:textColor="#64748b"
+            android:textStyle="bold" />
+        <EditText
+            android:id="@+id/et_ngay"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:hint="2025-01-15"
+            android:inputType="date"
+            android:layout_marginBottom="14dp"
+            android:background="@android:drawable/edit_text"
+            android:paddingHorizontal="12dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Số tiền (đ)"
+            android:textSize="12sp"
+            android:textColor="#64748b"
+            android:textStyle="bold" />
+        <EditText
+            android:id="@+id/et_so_tien"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:hint="0"
+            android:inputType="number"
+            android:layout_marginBottom="14dp"
+            android:background="@android:drawable/edit_text"
+            android:paddingHorizontal="12dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Mã tham chiếu / Note (tuỳ chọn)"
+            android:textSize="12sp"
+            android:textColor="#64748b"
+            android:textStyle="bold" />
+        <EditText
+            android:id="@+id/et_ghi_chu"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:hint="Số hóa đơn, STK..."
+            android:inputType="text"
+            android:maxLength="80"
+            android:layout_marginBottom="24dp"
+            android:background="@android:drawable/edit_text"
+            android:paddingHorizontal="12dp" />
+
+        <Button
+            android:id="@+id/btn_save"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:text="Xác thực lưu dữ liệu"
+            android:textAllCaps="true"
+            android:textStyle="bold"
+            android:backgroundTint="#4f46e5" />
+    </LinearLayout>
+</ScrollView>
