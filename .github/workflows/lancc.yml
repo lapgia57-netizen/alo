@@ -41,12 +41,15 @@ jobs:
           echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
           echo "Found project directory at: $PROJECT_DIR"
 
-      # 3. Kích hoạt hệ thống hỗ trợ Gradle Actions chính thức
+      # 3. Kích hoạt hệ thống hỗ trợ Gradle Actions và ÉP HIỆN LOG LỖI JAVA
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           build-root-directory: ${{ env.PROJECT_DIR }}
-          generate-submit-arguments: true 
+          generate-submit-arguments: true
+          # CHỈNH SỬA 1: Ngăn chặn Gradle Actions nuốt mất log biên dịch Java chi tiết
+          add-job-summary: 'on-failure'
+          cache-disabled: false
 
       # 4. Tự động chèn màu background bị thiếu nếu file colors.xml trống
       - name: Fix Missing Icon Resource
@@ -81,23 +84,23 @@ jobs:
           chmod +x ./gradlew
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           
-          # SỬA LỖI TẠI ĐÂY: Tạo file nếu chưa có, hoặc ghi nối tiếp (>>), KHÔNG dùng dấu (>) để xóa tệp gốc
           if [ ! -f "gradle.properties" ]; then
             touch gradle.properties
           fi
           
-          # Thêm cấu hình tiếng Việt và AndroidX an toàn mà không làm mất cấu hình cũ của dự án
           echo "" >> gradle.properties
           echo "android.useAndroidX=true" >> gradle.properties
           echo "android.enableJetifier=true" >> gradle.properties
           echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> gradle.properties
           echo "android.nonTransitiveRClass=false" >> gradle.properties
           
-          # Làm sạch triệt để bộ nhớ đệm trước khi build
           ./gradlew clean
           
-          # Tiến hành build và xuất log chi tiết
-          ./gradlew assembleDebug --info --stacktrace --no-daemon
+          # CHỈNH SỬA 2: Ép xuất log lỗi thô ra bảng điều khiển thay vì đẩy vào file JSON ngầm
+          ./gradlew compileDebugJavaWithJavac --stacktrace --no-daemon || true
+          
+          # Lệnh build chính thức
+          ./gradlew assembleDebug --stacktrace --no-daemon
 
       # 6. Xuất bản tệp APK lên mục Artifacts nếu build thành công
       - name: Upload APK
