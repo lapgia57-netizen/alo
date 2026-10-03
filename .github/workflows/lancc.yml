@@ -1,4 +1,4 @@
-name: Build SoThuChi APK (Strict Fix)
+name: Build SoThuChi APK (Ultimate Fix)
 
 on:
   push:
@@ -42,25 +42,47 @@ jobs:
           echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
           echo "Found project directory at: $PROJECT_DIR"
 
-      - name: Clear and Recreate Clean Colors Resource
+      - name: Inject Missing Colors Safely
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
-          # Xóa bỏ hoàn toàn file cũ để tránh việc lệnh sed trước đó chèn đè làm hỏng cú pháp XML
-          mkdir -p "app/src/main/res/values"
-          COLORS_FILE="app/src/main/res/values/colors.xml"
-          echo '<?xml version="1.0" encoding="utf-8"?>' > "$COLORS_FILE"
-          echo '<resources>' >> "$COLORS_FILE"
-          echo '    <color name="ic_launcher_background">#FFFFFF</color>' >> "$COLORS_FILE"
-          echo '</resources>' >> "$COLORS_FILE"
-          echo "✅ Đã khởi tạo lại file colors.xml chuẩn cấu trúc."
+          COLORS_DIR="app/src/main/res/values"
+          mkdir -p "$COLORS_DIR"
+          COLORS_FILE="$COLORS_DIR/colors.xml"
 
-      - name: Setup & Downgrade Gradle Wrapper for Compatibility
+          if [ ! -f "$COLORS_FILE" ] || [ ! -s "$COLORS_FILE" ]; then
+            # Nếu file hoàn toàn trống hoặc không tồn tại, khởi tạo chuẩn cấu trúc XML
+            echo '<?xml version="1.0" encoding="utf-8"?>' > "$COLORS_FILE"
+            echo '<resources>' >> "$COLORS_FILE"
+            echo '    <color name="ic_launcher_background">#FFFFFF</color>' >> "$COLORS_FILE"
+            echo '</resources>' >> "$COLORS_FILE"
+            echo "✅ Đã tạo mới hoàn toàn file colors.xml hợp lệ."
+          else
+            # Nếu file đã tồn tại, kiểm tra xem đã có key màu hệ thống đòi hỏi chưa
+            if ! grep -q "ic_launcher_background" "$COLORS_FILE"; then
+              # Xóa bỏ thẻ đóng cuối cùng tạm thời để chèn chuẩn xác vào cuối khối tài nguyên
+              sed -i 's|</resources>||g' "$COLORS_FILE"
+              echo '    <color name="ic_launcher_background">#FFFFFF</color>' >> "$COLORS_FILE"
+              echo '</resources>' >> "$COLORS_FILE"
+              echo "✅ Đã chèn bổ sung an toàn ic_launcher_background vào colors.xml gốc."
+            fi
+          fi
+
+      - name: Fix AAPT Cruncher Issues (Tối ưu hóa tài nguyên)
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
-          # Ép hệ thống tạo Wrapper với bản Gradle 8.7 (Bản ổn định nhất hiện tại, tránh lỗi nghiêm trọng của Gradle 9/10)
-          echo "=== Cấu hình Gradle Wrapper tương thích ==="
+          GRADLE_PROPERTIES="gradle.properties"
+          # Tắt tính năng nén PNG cũ của AAPT nhằm tránh crash bước processDebugResources do lỗi định dạng ảnh
+          echo "android.useNewCruncher=false" >> "$GRADLE_PROPERTIES"
+          echo "android.aaptOptions.cruncherEnabled=false" >> "$GRADLE_PROPERTIES"
+          echo "✅ Đã tối ưu hóa cấu hình tài nguyên AAPT chống crash."
+
+      - name: Setup Gradle Wrapper Stability
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          echo "=== Khởi tạo Gradle Wrapper ==="
           gradle wrapper --gradle-version=8.7 --distribution-type=bin
           chmod +x gradlew
 
@@ -71,16 +93,15 @@ jobs:
           generate-submit-arguments: true
           add-job-summary: 'always'
 
-      - name: Strict Build Debug APK
+      - name: Build Debug APK
         working-directory: ${{ env.PROJECT_DIR }}
-        # Thêm --warning-mode=all để hiển thị chi tiết nếu có lỗi và ép chạy sạch hoàn toàn
-        run: ./gradlew clean assembleDebug --stacktrace --warning-mode=all
+        run: ./gradlew clean assembleDebug --stacktrace --warning-mode=none
 
       - name: List Generated APKs
         if: always()
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
-          echo "=== Kiểm tra vị trí file APK đã xuất ==="
+          echo "=== Kiểm tra danh sách file xuất bản ==="
           find . -name "*.apk" || echo "Không tìm thấy file APK nào!"
 
       - name: Upload APK Artifact
