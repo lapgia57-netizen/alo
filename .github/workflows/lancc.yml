@@ -1,4 +1,4 @@
-name: Build SoThuChi APK (Ultimate Fix)
+name: Build SoThuChi APK (Java Compile Fix)
 
 on:
   push:
@@ -51,38 +51,30 @@ jobs:
           COLORS_FILE="$COLORS_DIR/colors.xml"
 
           if [ ! -f "$COLORS_FILE" ] || [ ! -s "$COLORS_FILE" ]; then
-            # Nếu file hoàn toàn trống hoặc không tồn tại, khởi tạo chuẩn cấu trúc XML
             echo '<?xml version="1.0" encoding="utf-8"?>' > "$COLORS_FILE"
             echo '<resources>' >> "$COLORS_FILE"
             echo '    <color name="ic_launcher_background">#FFFFFF</color>' >> "$COLORS_FILE"
             echo '</resources>' >> "$COLORS_FILE"
-            echo "✅ Đã tạo mới hoàn toàn file colors.xml hợp lệ."
           else
-            # Nếu file đã tồn tại, kiểm tra xem đã có key màu hệ thống đòi hỏi chưa
             if ! grep -q "ic_launcher_background" "$COLORS_FILE"; then
-              # Xóa bỏ thẻ đóng cuối cùng tạm thời để chèn chuẩn xác vào cuối khối tài nguyên
               sed -i 's|</resources>||g' "$COLORS_FILE"
               echo '    <color name="ic_launcher_background">#FFFFFF</color>' >> "$COLORS_FILE"
               echo '</resources>' >> "$COLORS_FILE"
-              echo "✅ Đã chèn bổ sung an toàn ic_launcher_background vào colors.xml gốc."
             fi
           fi
 
-      - name: Fix AAPT Cruncher Issues (Tối ưu hóa tài nguyên)
+      - name: Fix AAPT Cruncher Issues
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
           GRADLE_PROPERTIES="gradle.properties"
-          # Tắt tính năng nén PNG cũ của AAPT nhằm tránh crash bước processDebugResources do lỗi định dạng ảnh
           echo "android.useNewCruncher=false" >> "$GRADLE_PROPERTIES"
           echo "android.aaptOptions.cruncherEnabled=false" >> "$GRADLE_PROPERTIES"
-          echo "✅ Đã tối ưu hóa cấu hình tài nguyên AAPT chống crash."
 
-      - name: Setup Gradle Wrapper Stability
+      - name: Setup Gradle Wrapper Compatibility
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
-          echo "=== Khởi tạo Gradle Wrapper ==="
           gradle wrapper --gradle-version=8.7 --distribution-type=bin
           chmod +x gradlew
 
@@ -93,18 +85,34 @@ jobs:
           generate-submit-arguments: true
           add-job-summary: 'always'
 
-      - name: Build Debug APK
+      - name: Build & Force Print Java Compiler Errors
         working-directory: ${{ env.PROJECT_DIR }}
-        run: ./gradlew clean assembleDebug --stacktrace --warning-mode=none
+        shell: bash
+        run: |
+          echo "=== Đang tiến hành biên dịch và bắt lỗi code Java ==="
+          # Chạy assembleDebug và chuyển hướng toàn bộ log lỗi vào file text
+          ./gradlew clean assembleDebug --stacktrace > java_result_log.txt 2>&1 || JAVA_FAILED=true
+          
+          # Đọc toàn bộ nội dung log ra màn hình GitHub Console
+          cat java_result_log.txt
+          
+          # Nếu có lỗi, trích xuất chính xác các dòng thông báo lỗi compile của Javac
+          if [ "$JAVA_FAILED" = true ]; then
+            echo "========================================================"
+            echo "❌ DANH SÁCH CHI TIẾT CÁC DÒNG CODE JAVA BỊ LỖI:"
+            echo "========================================================"
+            grep -E "error:|exception|cannot find symbol|package .* does not exist" java_result_log.txt || echo "Vui lòng cuộn lên xem log tổng hợp ở trên."
+            exit 1
+          fi
 
       - name: List Generated APKs
-        if: always()
+        if: success()
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
-          echo "=== Kiểm tra danh sách file xuất bản ==="
-          find . -name "*.apk" || echo "Không tìm thấy file APK nào!"
+          find . -name "*.apk"
 
       - name: Upload APK Artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: SoThuChi-Debug-APK
