@@ -1,4 +1,4 @@
-name: Build SoThuChi APK (Java Compile Fix)
+name: Build SoThuChi APK (Force Java Compiler Logs)
 
 on:
   push:
@@ -85,25 +85,13 @@ jobs:
           generate-submit-arguments: true
           add-job-summary: 'always'
 
-      - name: Build & Force Print Java Compiler Errors
+      - name: Force Build & Print Unformatted Compiler Errors
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
-          echo "=== Đang tiến hành biên dịch và bắt lỗi code Java ==="
-          # Chạy assembleDebug và chuyển hướng toàn bộ log lỗi vào file text
-          ./gradlew clean assembleDebug --stacktrace > java_result_log.txt 2>&1 || JAVA_FAILED=true
-          
-          # Đọc toàn bộ nội dung log ra màn hình GitHub Console
-          cat java_result_log.txt
-          
-          # Nếu có lỗi, trích xuất chính xác các dòng thông báo lỗi compile của Javac
-          if [ "$JAVA_FAILED" = true ]; then
-            echo "========================================================"
-            echo "❌ DANH SÁCH CHI TIẾT CÁC DÒNG CODE JAVA BỊ LỖI:"
-            echo "========================================================"
-            grep -E "error:|exception|cannot find symbol|package .* does not exist" java_result_log.txt || echo "Vui lòng cuộn lên xem log tổng hợp ở trên."
-            exit 1
-          fi
+          echo "=== ÉP ĐỌC TRỰC TIẾP LỖI BIÊN DỊCH JAVA CỦA JAVAC ==="
+          # Chạy trực tiếp trên console=plain để tránh Gradle ẩn/nén log lỗi của Java compiler
+          ./gradlew clean assembleDebug --stacktrace --console=plain --warning-mode=all
 
       - name: List Generated APKs
         if: success()
