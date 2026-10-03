@@ -30,103 +30,87 @@ jobs:
         run: |
           sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
           yes | sdkmanager --licenses >/dev/null 2>&1 || true
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
 
       - name: Create missing resources & configs
         run: |
           set -e
-
-          # 1. Dummy google-services.json
-          mkdir -p app
-          cat > app/google-services.json << 'GSEOF'
-          {
-            "project_info": {
-              "project_number": "123456789012",
-              "project_id": "dummy-sothuchi",
-              "storage_bucket": "dummy-sothuchi.appspot.com"
-            },
-            "client": [
-              {
-                "client_info": {
-                  "mobilesdk_app_id": "1:123456789012:android:abcdef1234567890",
-                  "android_client_info": {
-                    "package_name": "com.moneytp.sothuchi"
-                  }
-                },
-                "oauth_client": [],
-                "api_key": [
-                  {
-                    "current_key": "AIzaSyDummyKeyForCIBuildOnly1234567890"
-                  }
-                ],
-                "services": {
-                  "appinvite_service": {
-                    "other_platform_oauth_client": []
-                  }
-                }
-              }
-            ],
-            "configuration_version": "1"
-          }
-          GSEOF
-
-          # 2. Minimal mipmap icons
+          mkdir -p app/src/main/res/values
           for dens in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
             mkdir -p app/src/main/res/mipmap-$dens
-            echo 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' | base64 -d > app/src/main/res/mipmap-$dens/ic_launcher.png
-            cp app/src/main/res/mipmap-$dens/ic_launcher.png app/src/main/res/mipmap-$dens/ic_launcher_round.png
           done
 
-          # 3. strings.xml
-          mkdir -p app/src/main/res/values
-          cat > app/src/main/res/values/strings.xml << 'STREOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <string name="app_name">Sổ Thu Chi</string>
-          </resources>
-          STREOF
+          # Write ALL files via Python – zero leading-space risk
+          python3 -c '
+import os, base64
 
-          # 4. themes.xml
-          cat > app/src/main/res/values/themes.xml << 'THEMEOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <style name="Theme.SoThuChi" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
-                  <item name="colorPrimary">@color/purple_500</item>
-                  <item name="colorPrimaryVariant">@color/purple_700</item>
-                  <item name="colorOnPrimary">@color/white</item>
-                  <item name="colorSecondary">@color/teal_200</item>
-                  <item name="colorOnSecondary">@color/black</item>
-              </style>
-          </resources>
-          THEMEOF
+# 1. google-services.json
+open("app/google-services.json","w").write("""{
+  "project_info": {
+    "project_number": "123456789012",
+    "project_id": "dummy-sothuchi",
+    "storage_bucket": "dummy-sothuchi.appspot.com"
+  },
+  "client": [{
+    "client_info": {
+      "mobilesdk_app_id": "1:123456789012:android:abcdef1234567890",
+      "android_client_info": {"package_name": "com.moneytp.sothuchi"}
+    },
+    "oauth_client": [],
+    "api_key": [{"current_key": "AIzaSyDummyKeyForCIBuildOnly1234567890"}],
+    "services": {"appinvite_service": {"other_platform_oauth_client": []}}
+  }],
+  "configuration_version": "1"
+}
+""")
 
-          # 5. local.properties
-          echo "sdk.dir=${ANDROID_HOME:-$ANDROID_SDK_ROOT}" > local.properties
+# 2. colors.xml – clean, no indent
+open("app/src/main/res/values/colors.xml","w").write("""<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="purple_500">#4f46e5</color>
+    <color name="purple_700">#1e1b4b</color>
+    <color name="teal_200">#6ee7b7</color>
+    <color name="black">#000000</color>
+    <color name="white">#FFFFFF</color>
+    <color name="rose_600">#e11d48</color>
+    <color name="emerald_600">#059669</color>
+</resources>
+""")
 
-          echo ">>> Resources created"
+# 3. strings.xml
+open("app/src/main/res/values/strings.xml","w").write("""<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">So Thu Chi</string>
+</resources>
+""")
 
-      # ========== FIX GRADLE WRAPPER (thiếu jar) ==========
+# 4. Do NOT create themes.xml – Manifest already uses Theme.MaterialComponents.*
+
+# 5. Icons
+png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+for dens in ["mdpi","hdpi","xhdpi","xxhdpi","xxxhdpi"]:
+    open(f"app/src/main/res/mipmap-{dens}/ic_launcher.png","wb").write(png)
+    open(f"app/src/main/res/mipmap-{dens}/ic_launcher_round.png","wb").write(png)
+
+# 6. local.properties
+sdk = os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT","")
+open("local.properties","w").write(f"sdk.dir={sdk}\n")
+
+print(">>> Resources OK")
+print(open("app/src/main/res/values/colors.xml").read())
+'
+
       - name: Setup Gradle Wrapper properly
         run: |
           set -e
-
-          # Xóa wrapper cũ (nếu có) để tạo lại sạch
           rm -rf gradle/wrapper
           mkdir -p gradle/wrapper
-
-          # Cài Gradle 8.2 tạm thời rồi generate wrapper đầy đủ (có jar)
           curl -sL https://services.gradle.org/distributions/gradle-8.2-bin.zip -o /tmp/gradle-8.2-bin.zip
           unzip -q /tmp/gradle-8.2-bin.zip -d /tmp
           /tmp/gradle-8.2/bin/gradle wrapper --gradle-version 8.2 --distribution-type bin
-
-          # Kiểm tra jar đã có
           ls -lh gradle/wrapper/
           test -f gradle/wrapper/gradle-wrapper.jar
-          test -f gradlew
           chmod +x gradlew
-
-          echo ">>> Gradle wrapper ready (with jar)"
+          echo ">>> Gradle wrapper ready"
 
       - name: Build Debug APK
         run: |
