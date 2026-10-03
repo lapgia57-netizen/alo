@@ -68,33 +68,16 @@ jobs:
 
       - name: Build Debug APK
         working-directory: ${{ env.PROJECT_DIR }}
-        shell: bash
-        env:
-          JAVA_TOOL_OPTIONS: "-Dfile.encoding=UTF-8"
-        run: |
-          if [ ! -f "./gradlew" ]; then
-            gradle wrapper --gradle-version 8.4
-          fi
-          chmod +x ./gradlew
-          echo "sdk.dir=$ANDROID_HOME" > local.properties
-          ./gradlew clean --no-daemon
-          ./gradlew assembleDebug --stacktrace --no-daemon > full_build_logs.txt 2>&1 || true
-          
-          APK_PATH=$(find . -path "**/build/outputs/apk/debug/*.apk" | head -n 1)
-          if [ -n "$APK_PATH" ]; then
-            echo "✅ Thành công! Đã tạo được file APK tại: $APK_PATH"
-            echo "BUILD_STATUS=SUCCESS" >> $GITHUB_ENV
-          else
-            echo "❌ Thất bại! Không tìm thấy tệp APK đích."
-            echo "BUILD_STATUS=FAILED" >> $GITHUB_ENV
-            exit 1
-          fi
+        run: ./gradlew clean assembleDebug
 
-      - name: Upload Finished APK
-        if: success()
+      - name: List Generated APKs (For Troubleshooting)
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          echo "=== Thư mục chứa file APK tìm thấy ==="
+          find . -name "*.apk" || echo "Không tìm thấy file APK nào!"
+
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: SoThuChi-Debug-APK
-          path: '${{ env.PROJECT_DIR }}/**/build/outputs/apk/debug/*.apk'
-          retention-days: 14
-          if-no-files-found: error
+          path: ${{ env.PROJECT_DIR }}/**/build/outputs/apk/debug/*.apk
