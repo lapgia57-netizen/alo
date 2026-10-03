@@ -37,7 +37,7 @@ jobs:
         run: |
           set -e
 
-          # 1. Dummy google-services.json (Firebase plugin requires this file)
+          # 1. Dummy google-services.json
           mkdir -p app
           cat > app/google-services.json << 'GSEOF'
           {
@@ -71,7 +71,7 @@ jobs:
           }
           GSEOF
 
-          # 2. Minimal mipmap icons (manifest requires @mipmap/ic_launcher)
+          # 2. Minimal mipmap icons
           for dens in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
             mkdir -p app/src/main/res/mipmap-$dens
             echo 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' | base64 -d > app/src/main/res/mipmap-$dens/ic_launcher.png
@@ -101,31 +101,32 @@ jobs:
           </resources>
           THEMEOF
 
-          # 5. Gradle wrapper 8.2 (compatible with AGP 8.2)
-          mkdir -p gradle/wrapper
-          cat > gradle/wrapper/gradle-wrapper.properties << 'WPEOF'
-          distributionBase=GRADLE_USER_HOME
-          distributionPath=wrapper/dists
-          distributionUrl=https\://services.gradle.org/distributions/gradle-8.2-bin.zip
-          networkTimeout=10000
-          validateDistributionUrl=true
-          zipStoreBase=GRADLE_USER_HOME
-          zipStorePath=wrapper/dists
-          WPEOF
-
-          # 6. Create gradlew if missing
-          if [ ! -f gradlew ]; then
-            curl -sL https://raw.githubusercontent.com/gradle/gradle/v8.2.0/gradlew -o gradlew
-            chmod +x gradlew
-          fi
-
-          # 7. local.properties
+          # 5. local.properties
           echo "sdk.dir=${ANDROID_HOME:-$ANDROID_SDK_ROOT}" > local.properties
 
-          echo ">>> All missing files created successfully"
+          echo ">>> Resources created"
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew || true
+      # ========== FIX GRADLE WRAPPER (thiếu jar) ==========
+      - name: Setup Gradle Wrapper properly
+        run: |
+          set -e
+
+          # Xóa wrapper cũ (nếu có) để tạo lại sạch
+          rm -rf gradle/wrapper
+          mkdir -p gradle/wrapper
+
+          # Cài Gradle 8.2 tạm thời rồi generate wrapper đầy đủ (có jar)
+          curl -sL https://services.gradle.org/distributions/gradle-8.2-bin.zip -o /tmp/gradle-8.2-bin.zip
+          unzip -q /tmp/gradle-8.2-bin.zip -d /tmp
+          /tmp/gradle-8.2/bin/gradle wrapper --gradle-version 8.2 --distribution-type bin
+
+          # Kiểm tra jar đã có
+          ls -lh gradle/wrapper/
+          test -f gradle/wrapper/gradle-wrapper.jar
+          test -f gradlew
+          chmod +x gradlew
+
+          echo ">>> Gradle wrapper ready (with jar)"
 
       - name: Build Debug APK
         run: |
