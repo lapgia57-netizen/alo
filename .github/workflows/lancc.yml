@@ -1,4 +1,4 @@
-name: Build SoThuChi APK (Force Java Compiler Logs)
+name: Build SoThuChi APK (Sequential Strict Mode)
 
 on:
   push:
@@ -23,6 +23,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Sử dụng JDK 17 kết hợp ép thuộc tính biên dịch chéo cho Android
       - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
@@ -42,7 +43,7 @@ jobs:
           echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
           echo "Found project directory at: $PROJECT_DIR"
 
-      - name: Inject Missing Colors Safely
+      - name: Fix Colors Resource Safely
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
@@ -63,7 +64,7 @@ jobs:
             fi
           fi
 
-      - name: Fix AAPT Cruncher Issues
+      - name: Fix AAPT Cruncher Properties
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
@@ -85,13 +86,18 @@ jobs:
           generate-submit-arguments: true
           add-job-summary: 'always'
 
-      - name: Force Build & Print Unformatted Compiler Errors
+      # BƯỚC TUẦN TỰ QUAN TRỌNG: Ép Gradle in chi tiết danh sách lỗi biên dịch (Compiler Errors)
+      - name: Compile Java & Force Display 44 Errors
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
-          echo "=== ÉP ĐỌC TRỰC TIẾP LỖI BIÊN DỊCH JAVA CỦA JAVAC ==="
-          # Chạy trực tiếp trên console=plain để tránh Gradle ẩn/nén log lỗi của Java compiler
-          ./gradlew clean assembleDebug --stacktrace --console=plain --warning-mode=all
+          echo "=== TIẾN HÀNH BIÊN DỊCH TUẦN TỰ VỚI LOG CHI TIẾT ==="
+          # Thêm cờ -Pandroid.display_compiler_errors=true và --no-daemon để chặn việc nuốt log của compiler
+          ./gradlew :app:compileDebugJavaWithJavac --stacktrace --no-daemon -Pandroid.display_compiler_errors=true
+
+      - name: Build Final Debug APK
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: ./gradlew assembleDebug
 
       - name: List Generated APKs
         if: success()
