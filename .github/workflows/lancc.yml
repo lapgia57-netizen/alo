@@ -1,4 +1,4 @@
-name: Build SoThuChi APK
+name: Build SoThuChi APK (Strict Fix)
 
 on:
   push:
@@ -42,48 +42,45 @@ jobs:
           echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
           echo "Found project directory at: $PROJECT_DIR"
 
-      - name: Setup Gradle
+      - name: Clear and Recreate Clean Colors Resource
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          # Xóa bỏ hoàn toàn file cũ để tránh việc lệnh sed trước đó chèn đè làm hỏng cú pháp XML
+          mkdir -p "app/src/main/res/values"
+          COLORS_FILE="app/src/main/res/values/colors.xml"
+          echo '<?xml version="1.0" encoding="utf-8"?>' > "$COLORS_FILE"
+          echo '<resources>' >> "$COLORS_FILE"
+          echo '    <color name="ic_launcher_background">#FFFFFF</color>' >> "$COLORS_FILE"
+          echo '</resources>' >> "$COLORS_FILE"
+          echo "✅ Đã khởi tạo lại file colors.xml chuẩn cấu trúc."
+
+      - name: Setup & Downgrade Gradle Wrapper for Compatibility
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          # Ép hệ thống tạo Wrapper với bản Gradle 8.7 (Bản ổn định nhất hiện tại, tránh lỗi nghiêm trọng của Gradle 9/10)
+          echo "=== Cấu hình Gradle Wrapper tương thích ==="
+          gradle wrapper --gradle-version=8.7 --distribution-type=bin
+          chmod +x gradlew
+
+      - name: Setup Gradle Action Caches
         uses: gradle/actions/setup-gradle@v4
         with:
           build-root-directory: ${{ env.PROJECT_DIR }}
           generate-submit-arguments: true
-          add-job-summary: 'never'
+          add-job-summary: 'always'
 
-      - name: Fix Missing Icon Resource
+      - name: Strict Build Debug APK
         working-directory: ${{ env.PROJECT_DIR }}
-        shell: bash
-        run: |
-          COLORS_FILE="app/src/main/res/values/colors.xml"
-          if [ ! -f "$COLORS_FILE" ]; then
-            mkdir -p "app/src/main/res/values"
-            echo '<?xml version="1.0" encoding="utf-8"?>' > "$COLORS_FILE"
-            echo '<resources>' >> "$COLORS_FILE"
-            echo '    <color name="ic_launcher_background">#FFFFFF</color>' >> "$COLORS_FILE"
-            echo '</resources>' >> "$COLORS_FILE"
-          else
-            if ! grep -q "ic_launcher_background" "$COLORS_FILE"; then
-              sed -i 's|</resources>|    <color name="ic_launcher_background">#FFFFFF</color>\n</resources>|' "$COLORS_FILE"
-            fi
-          fi
+        # Thêm --warning-mode=all để hiển thị chi tiết nếu có lỗi và ép chạy sạch hoàn toàn
+        run: ./gradlew clean assembleDebug --stacktrace --warning-mode=all
 
-      - name: Ensure Gradlew Wrapper Exists & Is Executable
-        working-directory: ${{ env.PROJECT_DIR }}
-        shell: bash
-        run: |
-          if [ ! -f "gradlew" ]; then
-            echo "⚠️ Không tìm thấy tệp gradlew tại ${{ env.PROJECT_DIR }}. Đang tự động khởi tạo wrapper..."
-            gradle wrapper
-          fi
-          chmod +x gradlew
-
-      - name: Build Debug APK
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: ./gradlew clean assembleDebug
-
-      - name: List Generated APKs (For Troubleshooting)
+      - name: List Generated APKs
+        if: always()
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
-          echo "=== Thư mục chứa file APK tìm thấy ==="
+          echo "=== Kiểm tra vị trí file APK đã xuất ==="
           find . -name "*.apk" || echo "Không tìm thấy file APK nào!"
 
       - name: Upload APK Artifact
