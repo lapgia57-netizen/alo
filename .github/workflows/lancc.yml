@@ -41,14 +41,17 @@ jobs:
           echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
           echo "Found project directory at: $PROJECT_DIR"
 
-      # 3. Khởi tạo cấu hình Gradle
+      # 3. ÉP TẮT HOÀN TOÀN TÍNH NĂNG GOM LOG VÀ HIỂN THỊ CỦA GRADLE ACTIONS
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           build-root-directory: ${{ env.PROJECT_DIR }}
           generate-submit-arguments: true
+          # ĐÂY LÀ CHÌA KHÓA: Buộc GitHub Actions không được gom nhóm hoặc ẩn log thô
+          add-job-summary: 'never'
+          arguments: '--no-daemon'
 
-      # 4. Tự động sửa lỗi thiếu tài nguyên Icon cũ nếu có
+      # 4. Tự động sửa lỗi tài nguyên màu nền Icon (Tránh lỗi vặt AAPT2)
       - name: Fix Missing Icon Resource
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
@@ -66,7 +69,7 @@ jobs:
             fi
           fi
 
-      # 5. Build dự án dựa trên cấu hình mã nguồn cũ gốc
+      # 5. Ép chạy Javac độc lập và lưu log lỗi tuyệt đối
       - name: Build Debug APK
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
@@ -81,28 +84,43 @@ jobs:
           chmod +x ./gradlew
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           
-          # THÀNH PHẦN THAY ĐỔI: Hoàn toàn KHÔNG can thiệp/KHÔNG tạo mới file gradle.properties bừa bãi nữa.
-          # Để cho hệ thống tự đọc file gradle.properties cũ trong repository (nếu có).
-          
+          # Không can thiệp ghi đè file thuộc tính nữa để tránh xung đột mã nguồn cũ
           ./gradlew clean
           
-          echo "🚀 Đang ép xuất danh sách lỗi biên dịch Java gốc..."
-          # Chạy biên dịch độc lập và bắt toàn bộ lỗi vào file văn bản (phòng trường hợp code cũ thực sự có lỗi)
-          ./gradlew compileDebugJavaWithJavac --no-daemon > full_java_errors.txt 2>&1 || true
+          echo "🚀 Tiến hành biên dịch Java..."
+          # Chạy tác vụ compile độc lập, chuyển hướng toàn bộ luồng lỗi ra file text thô
+          ./gradlew compileDebugJavaWithJavac --stacktrace --no-daemon > raw_compilation_errors.txt 2>&1 || true
           
-          # Thực hiện lệnh tạo APK chính thức
+          # Chạy bản dựng chính thức để kết thúc trạng thái
           ./gradlew assembleDebug --no-daemon
 
-      # 6. Tự động tải file chứa lỗi lên mục Artifacts nếu quá trình biên dịch thất bại
-      - name: Upload Compilation Error Logs
+      # 6. BƯỚC THẦN KỲ: Đọc file thô và in đè lên màn hình bất chấp bộ lọc của plugin
+      - name: Force Print 44 Java Errors to Console
+        if: failure()
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          echo "======================================================================"
+          echo "🚨 PHÁT HIỆN BIÊN DỊCH THẤT BẠI! ĐÂY LÀ TOÀN BỘ 44 LỖI TRONG CODE JAVA CỦA BẠN:"
+          echo "======================================================================"
+          if [ -f "raw_compilation_errors.txt" ]; then
+            # Dùng grep để lọc ra đúng các dòng chứa mã lỗi thật (loại bỏ log thừa của hệ thống)
+            grep -E "error:|: error|cannot find symbol|package.*does not exist" raw_compilation_errors.txt || cat raw_compilation_errors.txt
+          else
+            echo "Không tìm thấy file lưu log lỗi raw_compilation_errors.txt!"
+          fi
+          echo "======================================================================"
+
+      # 7. Lưu file lỗi về máy phòng hờ
+      - name: Upload Error Logs Artifact
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: Java-Compilation-Errors
-          path: '${{ env.PROJECT_DIR }}/full_java_errors.txt'
-          retention-days: 7
+          path: '${{ env.PROJECT_DIR }}/raw_compilation_errors.txt'
+          retention-days: 5
 
-      # 7. Xuất bản tệp APK lên mục Artifacts nếu build thành công mĩ mãn
+      # 8. Xuất file APK lên mục Artifacts nếu thành công
       - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
