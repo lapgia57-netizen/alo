@@ -66,6 +66,16 @@ jobs:
             fi
           fi
 
+      - name: Ensure Gradlew Wrapper Exists & Is Executable
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          if [ ! -f "gradlew" ]; then
+            echo "⚠️ Không tìm thấy tệp gradlew tại ${{ env.PROJECT_DIR }}. Đang tự động khởi tạo wrapper..."
+            gradle wrapper
+          fi
+          chmod +x gradlew
+
       - name: Build Debug APK
         working-directory: ${{ env.PROJECT_DIR }}
         run: ./gradlew clean assembleDebug
