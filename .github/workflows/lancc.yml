@@ -41,17 +41,16 @@ jobs:
           echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
           echo "Found project directory at: $PROJECT_DIR"
 
-      # 3. ÉP TẮT HOÀN TOÀN TÍNH NĂNG GOM LOG VÀ HIỂN THỊ CỦA GRADLE ACTIONS
+      # 3. FIX BUG TẠI ĐÂY: Xóa bỏ hoàn toàn thuộc tính 'arguments' bị lỗi
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           build-root-directory: ${{ env.PROJECT_DIR }}
           generate-submit-arguments: true
-          # ĐÂY LÀ CHÌA KHÓA: Buộc GitHub Actions không được gom nhóm hoặc ẩn log thô
+          # Tắt thông báo tóm tắt lỗi dạng JSON của GitHub để tránh nuốt log
           add-job-summary: 'never'
-          arguments: '--no-daemon'
 
-      # 4. Tự động sửa lỗi tài nguyên màu nền Icon (Tránh lỗi vặt AAPT2)
+      # 4. Tự động sửa lỗi tài nguyên màu nền Icon (Tránh lỗi vặt AAPT2 dừng daemon)
       - name: Fix Missing Icon Resource
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
@@ -69,14 +68,14 @@ jobs:
             fi
           fi
 
-      # 5. Ép chạy Javac độc lập và lưu log lỗi tuyệt đối
+      # 5. Build dự án và xử lý log biên dịch thông minh
       - name: Build Debug APK
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         env:
           JAVA_TOOL_OPTIONS: "-Dfile.encoding=UTF-8"
         run: |
-          if [ ! -f "./gradlew" ]; then
+          if [ ! -f "/gradlew" ]; then
             echo "⚠️ Không tìm thấy ./gradlew, đang khởi tạo nhanh Gradle Wrapper..."
             gradle wrapper --gradle-version 8.4
           fi
@@ -84,43 +83,50 @@ jobs:
           chmod +x ./gradlew
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           
-          # Không can thiệp ghi đè file thuộc tính nữa để tránh xung đột mã nguồn cũ
-          ./gradlew clean
+          # Không chèn đè các file properties lạ để giữ đúng bản chất mã nguồn cũ gốc của bạn
+          ./gradlew clean --no-daemon
           
-          echo "🚀 Tiến hành biên dịch Java..."
-          # Chạy tác vụ compile độc lập, chuyển hướng toàn bộ luồng lỗi ra file text thô
-          ./gradlew compileDebugJavaWithJavac --stacktrace --no-daemon > raw_compilation_errors.txt 2>&1 || true
+          echo "🚀 Tiến hành đóng gói thử APK Debug..."
+          # Đưa tham số đóng gói --no-daemon trực tiếp vào lệnh run thuần túy
+          ./gradlew assembleDebug --stacktrace --no-daemon > raw_build_logs.txt 2>&1 || true
           
-          # Chạy bản dựng chính thức để kết thúc trạng thái
-          ./gradlew assembleDebug --no-daemon
+          # Kiểm tra nếu file APK đã được tạo ra thành công (bất chấp log có cảnh báo gì)
+          APK_FILE=$(find . -path "**/build/outputs/apk/debug/*.apk" | head -n 1)
+          if [ -n "$APK_FILE" ]; then
+            echo "✅ Xuất file APK Debug thành công tại: $APK_FILE"
+          else
+            echo "❌ Đóng gói thất bại! File APK không được tạo ra."
+            # Kích hoạt trạng thái thất bại cho GitHub Actions để nhảy sang bước in lỗi
+            exit 1
+          fi
 
-      # 6. BƯỚC THẦN KỲ: Đọc file thô và in đè lên màn hình bất chấp bộ lọc của plugin
+      # 6. Hiển thị trực diện 44 lỗi biên dịch Java lên màn hình Console nếu quá trình trên thất bại
       - name: Force Print 44 Java Errors to Console
         if: failure()
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
           echo "======================================================================"
-          echo "🚨 PHÁT HIỆN BIÊN DỊCH THẤT BẠI! ĐÂY LÀ TOÀN BỘ 44 LỖI TRONG CODE JAVA CỦA BẠN:"
+          echo "🚨 PHÁT HIỆN BIÊN DỊCH THẤT BẠI! ĐÂY LÀ TOÀN BỘ LỖI TRONG CODE JAVA CỦA BẠN:"
           echo "======================================================================"
-          if [ -f "raw_compilation_errors.txt" ]; then
-            # Dùng grep để lọc ra đúng các dòng chứa mã lỗi thật (loại bỏ log thừa của hệ thống)
-            grep -E "error:|: error|cannot find symbol|package.*does not exist" raw_compilation_errors.txt || cat raw_compilation_errors.txt
+          if [ -f "raw_build_logstxt" ]; then
+            # Lọc chính xác các dòng lỗi thật để bạn không bị ngợp bởi hàng nghìn dòng log hệ thống
+            grep -E "error:|: error|cannot find symbol|package.*does not exist" raw_build_logs.txt || cat raw_build_logs.txt
           else
-            echo "Không tìm thấy file lưu log lỗi raw_compilation_errors.txt!"
+            echo "Không tìm thấy file lưu log lỗi raw_build_logs.txt!"
           fi
           echo "======================================================================"
 
-      # 7. Lưu file lỗi về máy phòng hờ
+      # 7. Lưu file log lỗi về mục Artifacts đề phòng bạn cần tải về máy xem chi tiết
       - name: Upload Error Logs Artifact
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: Java-Compilation-Errors
-          path: '${{ env.PROJECT_DIR }}/raw_compilation_errors.txt'
+          path: '${{ env.PROJECT_DIR }}/raw_build_logs.txt'
           retention-days: 5
 
-      # 8. Xuất file APK lên mục Artifacts nếu thành công
+      # 8. Xuất file APK thành phẩm lên mục Artifacts nếu quá trình đóng gói thành công rực rỡ
       - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
