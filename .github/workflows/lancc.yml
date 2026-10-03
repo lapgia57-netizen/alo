@@ -41,17 +41,14 @@ jobs:
           echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
           echo "Found project directory at: $PROJECT_DIR"
 
-      # 3. Kích hoạt hệ thống hỗ trợ Gradle Actions và ÉP HIỆN LOG LỖI JAVA
+      # 3. Khởi tạo cấu hình Gradle
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           build-root-directory: ${{ env.PROJECT_DIR }}
           generate-submit-arguments: true
-          # CHỈNH SỬA 1: Ngăn chặn Gradle Actions nuốt mất log biên dịch Java chi tiết
-          add-job-summary: 'on-failure'
-          cache-disabled: false
 
-      # 4. Tự động chèn màu background bị thiếu nếu file colors.xml trống
+      # 4. Tự động sửa lỗi thiếu tài nguyên Icon cũ nếu có
       - name: Fix Missing Icon Resource
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
@@ -69,7 +66,7 @@ jobs:
             fi
           fi
 
-      # 5. Tiến hành dọn dẹp hệ thống và ép biên dịch Java hiện lỗi chi tiết
+      # 5. Build dự án dựa trên cấu hình mã nguồn cũ gốc
       - name: Build Debug APK
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
@@ -84,26 +81,30 @@ jobs:
           chmod +x ./gradlew
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           
-          if [ ! -f "gradle.properties" ]; then
-            touch gradle.properties
-          fi
-          
-          echo "" >> gradle.properties
-          echo "android.useAndroidX=true" >> gradle.properties
-          echo "android.enableJetifier=true" >> gradle.properties
-          echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> gradle.properties
-          echo "android.nonTransitiveRClass=false" >> gradle.properties
+          # THÀNH PHẦN THAY ĐỔI: Hoàn toàn KHÔNG can thiệp/KHÔNG tạo mới file gradle.properties bừa bãi nữa.
+          # Để cho hệ thống tự đọc file gradle.properties cũ trong repository (nếu có).
           
           ./gradlew clean
           
-          # CHỈNH SỬA 2: Ép xuất log lỗi thô ra bảng điều khiển thay vì đẩy vào file JSON ngầm
-          ./gradlew compileDebugJavaWithJavac --stacktrace --no-daemon || true
+          echo "🚀 Đang ép xuất danh sách lỗi biên dịch Java gốc..."
+          # Chạy biên dịch độc lập và bắt toàn bộ lỗi vào file văn bản (phòng trường hợp code cũ thực sự có lỗi)
+          ./gradlew compileDebugJavaWithJavac --no-daemon > full_java_errors.txt 2>&1 || true
           
-          # Lệnh build chính thức
-          ./gradlew assembleDebug --stacktrace --no-daemon
+          # Thực hiện lệnh tạo APK chính thức
+          ./gradlew assembleDebug --no-daemon
 
-      # 6. Xuất bản tệp APK lên mục Artifacts nếu build thành công
+      # 6. Tự động tải file chứa lỗi lên mục Artifacts nếu quá trình biên dịch thất bại
+      - name: Upload Compilation Error Logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Java-Compilation-Errors
+          path: '${{ env.PROJECT_DIR }}/full_java_errors.txt'
+          retention-days: 7
+
+      # 7. Xuất bản tệp APK lên mục Artifacts nếu build thành công mĩ mãn
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: SoThuChi-Debug-APK
