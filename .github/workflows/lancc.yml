@@ -14,7 +14,7 @@ jobs:
   build:
     name: Build Android APK Fast
     runs-on: ubuntu-latest
-    timeout-minutes: 10 # Giảm timeout xuống thấp để tránh treo tiến trình độc hại
+    timeout-minutes: 15
     
     env:
       NODE_OPTIONS: "--no-deprecation"
@@ -23,7 +23,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Sử dụng JDK 17 (Bản chạy máy ảo Gradle nhanh nhất hiện tại)
+      # Dùng JDK 17 cho hiệu năng biên dịch tối ưu nhất
       - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
@@ -42,34 +42,42 @@ jobs:
           PROJECT_DIR=$(dirname "$SETTINGS_FILE")
           echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
 
-      - name: Setup Gradle Action Caches (Tăng tốc độ tải dependencies)
+      - name: Setup Gradle Action Caches
         uses: gradle/actions/setup-gradle@v4
         with:
           build-root-directory: ${{ env.PROJECT_DIR }}
           generate-submit-arguments: true
-          add-job-summary: 'never' # Tắt báo cáo để tiết kiệm thời gian
+          add-job-summary: 'never'
 
-      - name: Inject Speed & Compatibility Properties
+      - name: Inject Configuration & Avoid File Crashes
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
           GRADLE_PROPERTIES="gradle.properties"
-          # Ép Gradle chạy đa luồng và lưu cache cấu hình để tăng tốc 50%
+          # Kích hoạt đa luồng tăng tốc độ xử lý phần cứng lên tối đa
           echo "org.gradle.parallel=true" >> "$GRADLE_PROPERTIES"
-          echo "org.gradle.configuration-cache=true" >> "$GRADLE_PROPERTIES"
           echo "org.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m" >> "$GRADLE_PROPERTIES"
-          # Sửa lỗi màu nền hệ thống nếu thiếu để tránh AAPT2 bị dừng đột ngột
+          
+          # Fix cứng tệp colors nếu thiếu để dọn đường cho AAPT biên dịch giao diện
           mkdir -p "app/src/main/res/values"
           COLORS_FILE="app/src/main/res/values/colors.xml"
           if [ ! -f "$COLORS_FILE" ]; then
             echo -e '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="ic_launcher_background">#FFFFFF</color>\n</resources>' > "$COLORS_FILE"
           fi
 
+      # TRÁNH LỖI 127: Sử dụng lệnh hệ thống độc lập để tạo / cập nhật wrapper tự động
+      - name: Auto Generate Gradle Wrapper
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          echo "=== Khởi tạo lệnh Gradle cục bộ để bypass lỗi thiếu file ==="
+          gradle wrapper --gradle-version=8.7 --distribution-type=bin
+          chmod +x gradlew
+
       - name: Fast Build Debug APK
         working-directory: ${{ env.PROJECT_DIR }}
-        # Chạy trực tiếp lệnh assembleDebug loại bỏ build sạch (clean) để tận dụng cache cũ tối đa nếu có
-        # Thêm cờ --offline nếu bạn muốn ép hệ thống không tải lại thư viện mạng (nếu cache đã đủ)
-        run: ./gradlew assembleDebug --daemon --parallel --configuration-cache --warning-mode=none
+        # Thực hiện đóng gói sử dụng đa luồng song song mà không dọn cache cũ (bỏ lệnh clean để tăng tốc)
+        run: ./gradlew assembleDebug --parallel --warning-mode=none
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
