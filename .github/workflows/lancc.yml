@@ -24,17 +24,20 @@ jobs:
           cache: 'gradle'
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
-      - name: Accept Android licenses
-        run: yes | sdkmanager --licenses >/dev/null 2>&1 || true
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
 
-      # ---------- Fix project thiếu file để build không lỗi ----------
       - name: Create missing resources & configs
         run: |
           set -e
 
-          # 1. Dummy google-services.json (Firebase plugin bắt buộc file này)
+          # 1. Dummy google-services.json (Firebase plugin requires this file)
           mkdir -p app
           cat > app/google-services.json << 'GSEOF'
           {
@@ -68,14 +71,14 @@ jobs:
           }
           GSEOF
 
-          # 2. Tạo mipmap icons tối thiểu (manifest yêu cầu @mipmap/ic_launcher)
+          # 2. Minimal mipmap icons (manifest requires @mipmap/ic_launcher)
           for dens in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
             mkdir -p app/src/main/res/mipmap-$dens
             echo 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' | base64 -d > app/src/main/res/mipmap-$dens/ic_launcher.png
             cp app/src/main/res/mipmap-$dens/ic_launcher.png app/src/main/res/mipmap-$dens/ic_launcher_round.png
           done
 
-          # 3. strings.xml tối thiểu
+          # 3. strings.xml
           mkdir -p app/src/main/res/values
           cat > app/src/main/res/values/strings.xml << 'STREOF'
           <?xml version="1.0" encoding="utf-8"?>
@@ -98,7 +101,7 @@ jobs:
           </resources>
           THEMEOF
 
-          # 5. Sửa Gradle wrapper (AGP 8.2 cần Gradle >= 8.2)
+          # 5. Gradle wrapper 8.2 (compatible with AGP 8.2)
           mkdir -p gradle/wrapper
           cat > gradle/wrapper/gradle-wrapper.properties << 'WPEOF'
           distributionBase=GRADLE_USER_HOME
@@ -110,14 +113,14 @@ jobs:
           zipStorePath=wrapper/dists
           WPEOF
 
-          # 6. Tạo gradlew nếu thiếu
+          # 6. Create gradlew if missing
           if [ ! -f gradlew ]; then
             curl -sL https://raw.githubusercontent.com/gradle/gradle/v8.2.0/gradlew -o gradlew
             chmod +x gradlew
           fi
 
           # 7. local.properties
-          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          echo "sdk.dir=${ANDROID_HOME:-$ANDROID_SDK_ROOT}" > local.properties
 
           echo ">>> All missing files created successfully"
 
@@ -126,7 +129,7 @@ jobs:
 
       - name: Build Debug APK
         run: |
-          ./gradlew assembleDebug --no-daemon --stacktrace --info 2>&1 | tee build.log
+          ./gradlew assembleDebug --no-daemon --stacktrace
           test -f app/build/outputs/apk/debug/app-debug.apk
           echo ">>> APK built successfully"
 
