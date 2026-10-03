@@ -21,7 +21,13 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
+
+      # Thay thế bước kiểm tra Wrapper thủ công bằng Setup-Gradle chính thức
+      - name: Setup Gradle Environment
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.2 # Ép chạy phiên bản cố định an toàn
+          cache-disabled: false
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
@@ -93,17 +99,12 @@ jobs:
           print(">>> Resources & Configs OK")
           '
 
-      - name: Validate Gradle Wrapper
-        uses: gradle/actions/wrapper-validation@v4
-
-      - name: Make Gradle Wrapper Executable
+      # Cấp quyền thực thi và đồng bộ lại wrapper cục bộ để khớp với runner
+      - name: Prepare Local Gradle Execution
         run: |
-          if [ ! -f "gradlew" ]; then
-            echo "ERROR: Không tìm thấy file gradlew ở thư mục gốc của repo!"
-            exit 1
-          fi
+          gradle wrapper --gradle-version 8.2
           chmod +x gradlew
-          echo ">>> Cấp quyền thực thi thành công cho ./gradlew"
+          echo ">>> Khởi tạo môi trường thực thi cục bộ hoàn tất"
 
       - name: Build Debug APK
         run: |
