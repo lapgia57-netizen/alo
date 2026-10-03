@@ -81,8 +81,13 @@ jobs:
           chmod +x ./gradlew
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           
-          # Cấu hình tối ưu hóa tệp thuộc tính để tránh lỗi font chữ tiếng Việt
-          > gradle.properties
+          # SỬA LỖI TẠI ĐÂY: Tạo file nếu chưa có, hoặc ghi nối tiếp (>>), KHÔNG dùng dấu (>) để xóa tệp gốc
+          if [ ! -f "gradle.properties" ]; then
+            touch gradle.properties
+          fi
+          
+          # Thêm cấu hình tiếng Việt và AndroidX an toàn mà không làm mất cấu hình cũ của dự án
+          echo "" >> gradle.properties
           echo "android.useAndroidX=true" >> gradle.properties
           echo "android.enableJetifier=true" >> gradle.properties
           echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> gradle.properties
@@ -91,7 +96,7 @@ jobs:
           # Làm sạch triệt để bộ nhớ đệm trước khi build
           ./gradlew clean
           
-          # THAY ĐỔI CỐT LÕI: Thêm cờ --info để ép bóc trần toàn bộ mã lỗi Java sai cú pháp ra màn hình log
+          # Tiến hành build và xuất log chi tiết
           ./gradlew assembleDebug --info --stacktrace --no-daemon
 
       # 6. Xuất bản tệp APK lên mục Artifacts nếu build thành công
