@@ -13,8 +13,12 @@ jobs:
     timeout-minutes: 30
     strategy:
       matrix:
-        build-type: [debug, release]
-    if: matrix.build-type == 'debug' || (github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        build-type: >-
+          ${{ 
+            (github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') 
+            && fromJSON('["debug", "release"]') 
+            || fromJSON('["debug"]') 
+          }}
 
     steps:
       - name: Checkout Code
@@ -27,7 +31,6 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      # SỬA LỖI TẠI ĐÂY: Khai báo gói cụ thể cần dùng
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
@@ -42,8 +45,9 @@ jobs:
             chmod +x gradlew || true
           fi
 
+      # BƯỚC ĐÃ SỬA: Xuất file an toàn thông qua biến môi trường của GitHub Actions
       - name: Create local.properties
-        run: echo "sdk.dir=${ANDROID_SDK_ROOT:-$ANDROID_HOME}" > local.properties
+        run: echo "sdk.dir=${{ env.ANDROID_HOME }}" > local.properties
 
       - name: Build APK
         run: |
