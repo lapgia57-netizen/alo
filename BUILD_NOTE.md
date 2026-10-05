@@ -1,20 +1,57 @@
-# Hướng dẫn build Debug APK
+# Hướng dẫn build APK – Sổ Thu Chi (Native Android Java)
 
-## Những gì đã được sửa để project build được
+## Yêu cầu
+- JDK 17+
+- Android SDK (API 34)
+- `google-services.json` đúng project Firebase `tienbothi`, package `com.moneytp.sothuchi`
 
-1. Thêm `google-services.json` (bắt buộc vì dùng Firebase plugin)
-2. Thêm `res/values/strings.xml`, `themes.xml`
-3. Thêm icon launcher (drawable)
-4. Sửa `gradle-wrapper.properties` → Gradle 8.4 (tương thích AGP 8.2 + Java 17)
-5. Tạo workflow sạch: `.github/workflows/build-debug.yml`
+## Build local
 
-## Cách build trên GitHub Actions
+```bash
+# Cấp quyền
+chmod +x gradlew
 
-1. Commit toàn bộ thư mục này lên repo
-2. Vào tab **Actions** → **Build Debug APK** → **Run workflow**
-3. Tải artifact **SoThuChi-Debug-APK**
+# Debug APK
+./gradlew assembleDebug
 
-## Lưu ý
+# Release APK (unsigned)
+./gradlew assembleRelease
+```
 
-- File `google-services.json` hiện tại là bản tối thiểu để build được.
-  Khi chạy thật trên thiết bị, bạn nên thay bằng file chính xác từ Firebase Console (project `tienbothi`, package `com.moneytp.sothuchi`).
+APK nằm tại:
+- Debug: `app/build/outputs/apk/debug/app-debug.apk`
+- Release: `app/build/outputs/apk/release/app-release-unsigned.apk`
+
+## GitHub Actions
+
+File: `.github/workflows/build.yml`
+
+- Push / PR vào `main` hoặc `master` → build **Debug APK**
+- `workflow_dispatch` hoặc push `main` → thêm job **Release APK**
+
+Artifact tải về từ tab **Actions** → run tương ứng → **SoThuChi-Debug-APK** / **SoThuChi-Release-APK**
+
+## Tối ưu đã áp dụng
+1. **DataRepository**: cache ConcurrentHashMap + LiveData + parse trên background thread
+2. Firebase **disk persistence** + `keepSynced`
+3. Pre-computed balance & chart aggregates (không duyệt list trên UI thread)
+4. **DiffUtil** trong RecyclerView adapter
+5. Material Design light theme (dễ đọc số liệu)
+
+## Lưu ý Firebase
+- Thay `app/google-services.json` bằng file thật từ Firebase Console
+- Bật Email/Password Authentication
+- Realtime Database rules:
+
+```json
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    }
+  }
+}
+```

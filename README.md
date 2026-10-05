@@ -8,87 +8,44 @@
 - Ghi nhận **Chi tiêu** và **Thu nhập**
 - Thêm / Sửa / Xóa giao dịch (realtime)
 - Tính tổng thu, tổng chi, số dư
-- **Biểu đồ**:
-  - Pie chart chi tiêu theo danh mục
-  - Pie chart thu nhập theo danh mục
-  - Bar chart thu/chi theo tháng
-- Giao diện **màu sáng** (light theme) tối ưu hiển thị dữ liệu
+- **Biểu đồ**: Pie (danh mục) + Bar (theo tháng)
+- Giao diện **Material Design light theme** tối ưu hiển thị dữ liệu
 
-## Cấu trúc dữ liệu Firebase (giữ nguyên từ app gốc)
+## Tối ưu data & UI
+
+| Kỹ thuật | Mô tả |
+|----------|--------|
+| DataRepository singleton | Cache ConcurrentHashMap + LiveData |
+| Background parse/sort | Không block UI thread |
+| Pre-computed aggregates | Balance + chart data sẵn sàng |
+| Firebase persistence | Offline cache + keepSynced |
+| DiffUtil RecyclerView | Chỉ rebind item thay đổi |
+
+## Cấu trúc Firebase
 
 ```
-users/
-  {uid}/
-    chi-tieu/
-      {pushId}/
-        danh_muc: string
-        mo_ta: string
-        ngay: "YYYY-MM-DD"
-        so_tien: number
-        ghi_chu: string | null
-        thoi_gian: number (timestamp)
-    thu-nhap/
-      {pushId}/
-        ... (cùng cấu trúc)
+users/{uid}/chi-tieu/{pushId}
+users/{uid}/thu-nhap/{pushId}
+  danh_muc, mo_ta, ngay, so_tien, ghi_chu, thoi_gian
 ```
 
-## Cách build APK
+## Build APK
 
-### 1. Chuẩn bị Firebase
-
-1. Vào [Firebase Console](https://console.firebase.google.com/) → project **tienbothi**
-2. Thêm app **Android** với package name: `com.moneytp.sothuchi`
-3. Tải file `google-services.json` thật và **thay thế** file trong thư mục `app/`
-4. Bật **Email/Password** Authentication
-5. Realtime Database rules nên cho phép user chỉ đọc/ghi data của chính mình:
-
-```json
-{
-  "rules": {
-    "users": {
-      "$uid": {
-        ".read": "auth != null && auth.uid == $uid",
-        ".write": "auth != null && auth.uid == $uid"
-      }
-    }
-  }
-}
-```
-
-### 2. Mở project bằng Android Studio
-
-1. Mở Android Studio → **Open** → chọn thư mục `SoThuChiJava`
-2. Chờ Gradle sync xong
-3. Kết nối máy Android hoặc dùng Emulator
-4. Bấm **Run** (▶) để chạy
-
-### 3. Build APK Release
+### Local
 
 ```bash
-cd SoThuChiJava
-./gradlew assembleRelease
+chmod +x gradlew
+./gradlew assembleDebug
+# → app/build/outputs/apk/debug/app-debug.apk
 ```
 
-File APK nằm tại:
-```
-app/build/outputs/apk/release/app-release-unsigned.apk
-```
+### GitHub Actions
 
-(Ký APK bằng keystore của bạn trước khi phân phối.)
+Workflow: `.github/workflows/build.yml`  
+Artifact: **SoThuChi-Debug-APK** / **SoThuChi-Release-APK**
 
-## Thư viện sử dụng
-
-- Firebase Auth + Realtime Database
-- Material Components 3
-- MPAndroidChart (biểu đồ)
-- AndroidX (AppCompat, RecyclerView, ViewPager2, …)
+Xem chi tiết trong `BUILD_NOTE.md`.
 
 ## Package
 
 `com.moneytp.sothuchi`
-
-## Ghi chú
-
-- Code giữ nguyên 100% logic đọc/ghi Firebase của app Capacitor gốc.
-- Giao diện chuyển sang light theme để dữ liệu dễ đọc hơn.
-- Biểu đồ tự cập nhật realtime khi có thay đổi dữ liệu.

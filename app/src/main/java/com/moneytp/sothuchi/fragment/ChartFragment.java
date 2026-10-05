@@ -8,8 +8,8 @@ import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.Observer;
 
 import com.github.mikephil.charting.charts.BarChart;
 import com.github.mikephil.charting.charts.PieChart;
@@ -24,31 +24,19 @@ import com.github.mikephil.charting.data.PieDataSet;
 import com.github.mikephil.charting.data.PieEntry;
 import com.github.mikephil.charting.formatter.IndexAxisValueFormatter;
 import com.github.mikephil.charting.formatter.PercentFormatter;
-import com.github.mikephil.charting.utils.ColorTemplate;
-import com.google.firebase.database.ValueEventListener;
 import com.moneytp.sothuchi.R;
-import com.moneytp.sothuchi.model.Transaction;
-import com.moneytp.sothuchi.util.FirebaseHelper;
+import com.moneytp.sothuchi.util.DataRepository;
 
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * Biểu đồ dữ liệu - màu sáng, dễ đọc.
- * - Pie chart chi tiêu theo danh mục
- * - Pie chart thu nhập theo danh mục
- * - Bar chart thu/chi theo tháng
+ * Biểu đồ — dùng ChartData pre-computed từ DataRepository (không parse lại list).
+ * Material light theme, animation mượt.
  */
 public class ChartFragment extends Fragment {
-
-    private FirebaseHelper firebaseHelper;
-    private ValueEventListener chiListener, thuListener;
-    private List<Transaction> allChi = new ArrayList<>();
-    private List<Transaction> allThu = new ArrayList<>();
 
     private PieChart pieChartExpense;
     private PieChart pieChartIncome;
@@ -75,7 +63,6 @@ public class ChartFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        firebaseHelper = new FirebaseHelper();
 
         pieChartExpense = view.findViewById(R.id.pieChartExpense);
         pieChartIncome = view.findViewById(R.id.pieChartIncome);
@@ -85,7 +72,16 @@ public class ChartFragment extends Fragment {
         setupPieChart(pieChartIncome);
         setupBarChart(barChartMonthly);
 
-        loadData();
+        DataRepository.getInstance().getChartLiveData()
+                .observe(getViewLifecycleOwner(), new Observer<DataRepository.ChartData>() {
+                    @Override
+                    public void onChanged(DataRepository.ChartData data) {
+                        if (data == null) return;
+                        updatePieChart(pieChartExpense, data.chiByCategory, "Chi tiêu");
+                        updatePieChart(pieChartIncome, data.thuByCategory, "Thu nhập");
+                        updateBarChart(data.thuByMonth, data.chiByMonth);
+                    }
+                });
     }
 
     private void setupPieChart(PieChart chart) {
@@ -123,6 +119,7 @@ public class ChartFragment extends Fragment {
         chart.setPinchZoom(false);
         chart.setScaleEnabled(false);
         chart.setFitBars(true);
+        chart.setExtraBottomOffset(8f);
 
         XAxis xAxis = chart.getXAxis();
         xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
@@ -135,7 +132,6 @@ public class ChartFragment extends Fragment {
         left.setDrawGridLines(true);
         left.setGridColor(Color.parseColor("#E2E8F0"));
         left.setTextColor(Color.parseColor("#64748B"));
-        left.setTextSize(10f);
         left.setAxisMinimum(0f);
 
         chart.getAxisRight().setEnabled(false);
@@ -149,56 +145,18 @@ public class ChartFragment extends Fragment {
         legend.setTextColor(Color.parseColor("#64748B"));
     }
 
-    private void loadData() {
-        chiListener = firebaseHelper.listenTransactions(FirebaseHelper.TYPE_CHI,
-                new FirebaseHelper.DataCallback() {
-                    @Override
-                    public void onData(List<Transaction> list) {
-                        allChi = list != null ? list : new ArrayList<>();
-                        updateCharts();
-                    }
-
-                    @Override
-                    public void onError(String message) { }
-                });
-
-        thuListener = firebaseHelper.listenTransactions(FirebaseHelper.TYPE_THU,
-                new FirebaseHelper.DataCallback() {
-                    @Override
-                    public void onData(List<Transaction> list) {
-                        allThu = list != null ? list : new ArrayList<>();
-                        updateCharts();
-                    }
-
-                    @Override
-                    public void onError(String message) { }
-                });
-    }
-
-    private void updateCharts() {
-        if (!isAdded()) return;
-        updatePieChart(pieChartExpense, allChi, "Chi tiêu");
-        updatePieChart(pieChartIncome, allThu, "Thu nhập");
-        updateBarChart();
-    }
-
-    private void updatePieChart(PieChart chart, List<Transaction> data, String centerText) {
-        Map<String, Float> categorySum = new HashMap<>();
-        for (Transaction t : data) {
-            String cat = t.getDanh_muc() != null && !t.getDanh_muc().isEmpty()
-                    ? t.getDanh_muc() : "Khác";
-            categorySum.put(cat, categorySum.getOrDefault(cat, 0f) + t.getSo_tien());
-        }
-
+    private void updatePieChart(PieChart chart, Map<String, Long> categorySum, String centerText) {
         ArrayList<PieEntry> entries = new ArrayList<>();
-        for (Map.Entry<String, Float> e : categorySum.entrySet()) {
-            if (e.getValue() > 0) {
-                entries.add(new PieEntry(e.getValue(), e.getKey()));
+        if (categorySum != null) {
+            for (Map.Entry<String, Long> e : categorySum.entrySet()) {
+                if (e.getValue() != null && e.getValue() > 0) {
+                    entries.add(new PieEntry(e.getValue().floatValue(), e.getKey()));
+                }
             }
         }
 
         if (entries.isEmpty()) {
-            chart.setData(null);
+            chart.clear();
             chart.setCenterText("Chưa có dữ liệu");
             chart.invalidate();
             return;
@@ -221,87 +179,67 @@ public class ChartFragment extends Fragment {
         chart.setCenterTextSize(13f);
         chart.setCenterTextColor(Color.parseColor("#0F172A"));
         chart.highlightValues(null);
+        chart.animateY(500);
         chart.invalidate();
-        chart.animateY(600);
     }
 
-    private void updateBarChart() {
-        // Group theo tháng (YYYY-MM)
-        TreeMap<String, float[]> monthly = new TreeMap<>(); // [0]=thu, [1]=chi
+    private void updateBarChart(Map<String, Long> thuByMonth, Map<String, Long> chiByMonth) {
+        TreeMap<String, float[]> monthly = new TreeMap<>();
 
-        for (Transaction t : allThu) {
-            String month = extractMonth(t.getNgay());
-            float[] vals = monthly.getOrDefault(month, new float[]{0f, 0f});
-            vals[0] += t.getSo_tien();
-            monthly.put(month, vals);
+        if (thuByMonth != null) {
+            for (Map.Entry<String, Long> e : thuByMonth.entrySet()) {
+                float[] vals = monthly.getOrDefault(e.getKey(), new float[]{0f, 0f});
+                vals[0] = e.getValue() != null ? e.getValue() : 0f;
+                monthly.put(e.getKey(), vals);
+            }
         }
-        for (Transaction t : allChi) {
-            String month = extractMonth(t.getNgay());
-            float[] vals = monthly.getOrDefault(month, new float[]{0f, 0f});
-            vals[1] += t.getSo_tien();
-            monthly.put(month, vals);
+        if (chiByMonth != null) {
+            for (Map.Entry<String, Long> e : chiByMonth.entrySet()) {
+                float[] vals = monthly.getOrDefault(e.getKey(), new float[]{0f, 0f});
+                vals[1] = e.getValue() != null ? e.getValue() : 0f;
+                monthly.put(e.getKey(), vals);
+            }
         }
 
         if (monthly.isEmpty()) {
-            barChartMonthly.setData(null);
+            barChartMonthly.clear();
             barChartMonthly.invalidate();
             return;
         }
 
-        ArrayList<BarEntry> incomeEntries = new ArrayList<>();
-        ArrayList<BarEntry> expenseEntries = new ArrayList<>();
-        ArrayList<String> labels = new ArrayList<>();
-
+        List<String> labels = new ArrayList<>();
+        ArrayList<BarEntry> thuEntries = new ArrayList<>();
+        ArrayList<BarEntry> chiEntries = new ArrayList<>();
         int i = 0;
         for (Map.Entry<String, float[]> e : monthly.entrySet()) {
             labels.add(e.getKey());
-            incomeEntries.add(new BarEntry(i, e.getValue()[0]));
-            expenseEntries.add(new BarEntry(i, e.getValue()[1]));
+            thuEntries.add(new BarEntry(i, e.getValue()[0]));
+            chiEntries.add(new BarEntry(i, e.getValue()[1]));
             i++;
         }
 
-        BarDataSet incomeSet = new BarDataSet(incomeEntries, "Thu nhập");
-        incomeSet.setColor(Color.parseColor("#10B981"));
-        incomeSet.setValueTextSize(9f);
-        incomeSet.setValueTextColor(Color.parseColor("#059669"));
+        BarDataSet thuSet = new BarDataSet(thuEntries, "Thu");
+        thuSet.setColor(Color.parseColor("#059669"));
+        thuSet.setValueTextSize(9f);
 
-        BarDataSet expenseSet = new BarDataSet(expenseEntries, "Chi tiêu");
-        expenseSet.setColor(Color.parseColor("#F43F5E"));
-        expenseSet.setValueTextSize(9f);
-        expenseSet.setValueTextColor(Color.parseColor("#E11D48"));
+        BarDataSet chiSet = new BarDataSet(chiEntries, "Chi");
+        chiSet.setColor(Color.parseColor("#E11D48"));
+        chiSet.setValueTextSize(9f);
 
         float groupSpace = 0.2f;
         float barSpace = 0.05f;
         float barWidth = 0.35f;
 
-        BarData barData = new BarData(incomeSet, expenseSet);
-        barData.setBarWidth(barWidth);
+        BarData data = new BarData(thuSet, chiSet);
+        data.setBarWidth(barWidth);
 
-        barChartMonthly.setData(barData);
+        barChartMonthly.setData(data);
         barChartMonthly.getXAxis().setValueFormatter(new IndexAxisValueFormatter(labels));
         barChartMonthly.getXAxis().setLabelCount(labels.size());
-        barChartMonthly.groupBars(0f, groupSpace, barSpace);
-        barChartMonthly.getXAxis().setAxisMinimum(0f);
-        barChartMonthly.getXAxis().setAxisMaximum(0f + barData.getGroupWidth(groupSpace, barSpace) * labels.size());
+        barChartMonthly.getXAxis().setAxisMinimum(0);
+        barChartMonthly.getXAxis().setAxisMaximum(labels.size());
+        barChartMonthly.groupBars(0, groupSpace, barSpace);
+        barChartMonthly.animateY(500);
         barChartMonthly.invalidate();
-        barChartMonthly.animateY(600);
-    }
-
-    private String extractMonth(String ngay) {
-        if (ngay != null && ngay.length() >= 7) {
-            return ngay.substring(0, 7); // YYYY-MM
-        }
-        return "N/A";
-    }
-
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        if (chiListener != null) {
-            firebaseHelper.removeListener(FirebaseHelper.TYPE_CHI, chiListener);
-        }
-        if (thuListener != null) {
-            firebaseHelper.removeListener(FirebaseHelper.TYPE_THU, thuListener);
-        }
     }
 }

@@ -12,26 +12,30 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.Observer;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
-import com.google.firebase.database.ValueEventListener;
 import com.moneytp.sothuchi.AddEditActivity;
 import com.moneytp.sothuchi.R;
 import com.moneytp.sothuchi.adapter.TransactionAdapter;
 import com.moneytp.sothuchi.model.Transaction;
-import com.moneytp.sothuchi.util.FirebaseHelper;
+import com.moneytp.sothuchi.util.DataRepository;
 
 import java.util.List;
 
+/**
+ * Danh sách giao dịch — dùng LiveData từ DataRepository (cache + realtime).
+ * Swipe-to-refresh chỉ để feedback UX; data đã realtime nên không cần re-query.
+ */
 public class TransactionListFragment extends Fragment {
 
     private static final String ARG_TYPE = "type";
 
     private String type;
-    private FirebaseHelper firebaseHelper;
-    private ValueEventListener listener;
+    private boolean isChi;
+    private DataRepository repository;
     private TransactionAdapter adapter;
     private RecyclerView recyclerView;
     private TextView tvEmpty;
@@ -49,9 +53,12 @@ public class TransactionListFragment extends Fragment {
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         if (getArguments() != null) {
-            type = getArguments().getString(ARG_TYPE, FirebaseHelper.TYPE_CHI);
+            type = getArguments().getString(ARG_TYPE, DataRepository.NODE_CHI);
+        } else {
+            type = DataRepository.NODE_CHI;
         }
-        firebaseHelper = new FirebaseHelper();
+        isChi = DataRepository.NODE_CHI.equals(type);
+        repository = DataRepository.getInstance();
     }
 
     @Nullable
@@ -84,61 +91,56 @@ public class TransactionListFragment extends Fragment {
                 new AlertDialog.Builder(requireContext())
                         .setTitle(R.string.xoa)
                         .setMessage(R.string.xac_nhan_xoa)
-                        .setPositiveButton(R.string.xoa, (d, w) -> {
-                            firebaseHelper.deleteTransaction(type, item.getKey(),
-                                    new FirebaseHelper.SimpleCallback() {
+                        .setPositiveButton(android.R.string.ok, (d, w) -> {
+                            repository.deleteTransaction(isChi, item.getKey(),
+                                    new DataRepository.OnCompleteListener() {
                                         @Override
                                         public void onSuccess() {
-                                            // Realtime listener sẽ tự cập nhật
+                                            // LiveData tự cập nhật
                                         }
 
                                         @Override
                                         public void onError(String message) {
-                                            Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
+                                            if (isAdded()) {
+                                                Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
+                                            }
                                         }
                                     });
                         })
-                        .setNegativeButton(R.string.huy, null)
+                        .setNegativeButton(android.R.string.cancel, null)
                         .show();
             }
         });
 
         recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
+        recyclerView.setHasFixedSize(true);
         recyclerView.setAdapter(adapter);
 
-        swipeRefresh.setOnRefreshListener(this::loadData);
-        loadData();
-    }
-
-    private void loadData() {
-        if (listener != null) {
-            firebaseHelper.removeListener(type, listener);
-        }
-        listener = firebaseHelper.listenTransactions(type, new FirebaseHelper.DataCallback() {
-            @Override
-            public void onData(List<Transaction> list) {
-                if (!isAdded()) return;
-                swipeRefresh.setRefreshing(false);
-                adapter.setData(list);
-                tvEmpty.setVisibility(list.isEmpty() ? View.VISIBLE : View.GONE);
-                recyclerView.setVisibility(list.isEmpty() ? View.GONE : View.VISIBLE);
-            }
-
-            @Override
-            public void onError(String message) {
-                if (!isAdded()) return;
-                swipeRefresh.setRefreshing(false);
-                Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
-            }
+        // Swipe refresh: feedback UX, data đã realtime qua LiveData
+        swipeRefresh.setColorSchemeResources(R.color.primary);
+        swipeRefresh.setOnRefreshListener(() -> {
+            // Force re-emit từ cache (không query lại Firebase)
+            swipeRefresh.postDelayed(() -> {
+                if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+            }, 400);
         });
-    }
 
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        if (listener != null) {
-            firebaseHelper.removeListener(type, listener);
-            listener = null;
+        // Observe LiveData — cập nhật UI ngay khi cache đổi
+        Observer<List<Transaction>> observer = list -> {
+            if (list == null) list = java.util.Collections.emptyList();
+            adapter.submitList(list);
+            boolean empty = list.isEmpty();
+            tvEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
+            recyclerView.setVisibility(empty ? View.GONE : View.VISIBLE);
+            if (swipeRefresh.isRefreshing()) {
+                swipeRefresh.setRefreshing(false);
+            }
+        };
+
+        if (isChi) {
+            repository.getChiLiveData().observe(getViewLifecycleOwner(), observer);
+        } else {
+            repository.getThuLiveData().observe(getViewLifecycleOwner(), observer);
         }
     }
 }

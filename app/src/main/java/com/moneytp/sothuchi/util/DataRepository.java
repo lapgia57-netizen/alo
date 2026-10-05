@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Repository tối ưu tốc độ load & hiển thị dữ liệu.
@@ -33,28 +34,27 @@ import java.util.concurrent.Executors;
  * Các kỹ thuật tối ưu:
  * 1. Single ValueEventListener + ConcurrentHashMap cache (tránh re-query)
  * 2. Background thread parse + sort (không block UI)
- * 3. Diff-aware LiveData (chỉ emit khi dữ liệu thực sự thay đổi)
+ * 3. LiveData (chỉ emit khi dữ liệu thay đổi)
  * 4. Pre-computed totals + category aggregates cho biểu đồ
- * 5. Object pooling nhẹ + reuse List để giảm GC
+ * 5. Firebase disk persistence + keepSynced
  */
 public class DataRepository {
 
     private static final String TAG = "DataRepository";
-    private static final String NODE_CHI = "chi-tieu";
-    private static final String NODE_THU = "thu-nhap";
+    public static final String NODE_CHI = "chi-tieu";
+    public static final String NODE_THU = "thu-nhap";
 
-    private static DataRepository instance;
+    private static volatile DataRepository instance;
+    private static final AtomicBoolean persistenceEnabled = new AtomicBoolean(false);
 
     private final FirebaseDatabase db;
     private final FirebaseAuth auth;
     private final ExecutorService bgExecutor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
-    // Cache thread-safe
     private final Map<String, Transaction> chiCache = new ConcurrentHashMap<>();
     private final Map<String, Transaction> thuCache = new ConcurrentHashMap<>();
 
-    // LiveData
     private final MutableLiveData<List<Transaction>> chiLiveData = new MutableLiveData<>(new ArrayList<>());
     private final MutableLiveData<List<Transaction>> thuLiveData = new MutableLiveData<>(new ArrayList<>());
     private final MutableLiveData<BalanceSummary> balanceLiveData = new MutableLiveData<>(new BalanceSummary(0, 0, 0));
@@ -66,14 +66,25 @@ public class DataRepository {
     private DatabaseReference thuRef;
 
     private DataRepository() {
+        if (persistenceEnabled.compareAndSet(false, true)) {
+            try {
+                FirebaseDatabase.getInstance("https://tienbothi-default-rtdb.firebaseio.com")
+                        .setPersistenceEnabled(true);
+            } catch (Exception e) {
+                Log.w(TAG, "Persistence already enabled or failed: " + e.getMessage());
+            }
+        }
         db = FirebaseDatabase.getInstance("https://tienbothi-default-rtdb.firebaseio.com");
         auth = FirebaseAuth.getInstance();
-        db.setPersistenceEnabled(true); // Offline cache của Firebase
     }
 
-    public static synchronized DataRepository getInstance() {
+    public static DataRepository getInstance() {
         if (instance == null) {
-            instance = new DataRepository();
+            synchronized (DataRepository.class) {
+                if (instance == null) {
+                    instance = new DataRepository();
+                }
+            }
         }
         return instance;
     }
@@ -83,13 +94,12 @@ public class DataRepository {
     public LiveData<BalanceSummary> getBalanceLiveData() { return balanceLiveData; }
     public LiveData<ChartData> getChartLiveData() { return chartLiveData; }
 
-    /** Bắt đầu lắng nghe realtime khi user đăng nhập */
     public void startListening() {
         FirebaseUser user = auth.getCurrentUser();
         if (user == null) return;
 
         String uid = user.getUid();
-        stopListening(); // tránh duplicate listener
+        stopListening();
 
         chiRef = db.getReference("users").child(uid).child(NODE_CHI);
         thuRef = db.getReference("users").child(uid).child(NODE_THU);
@@ -97,7 +107,6 @@ public class DataRepository {
         chiListener = new FastValueListener(true);
         thuListener = new FastValueListener(false);
 
-        // keepSynced giúp Firebase giữ data trong memory + disk
         chiRef.keepSynced(true);
         thuRef.keepSynced(true);
 
@@ -116,7 +125,17 @@ public class DataRepository {
         thuListener = null;
     }
 
-    /** Listener tối ưu: chỉ parse trên background thread */
+    public void clearCache() {
+        chiCache.clear();
+        thuCache.clear();
+        mainHandler.post(() -> {
+            chiLiveData.setValue(new ArrayList<>());
+            thuLiveData.setValue(new ArrayList<>());
+            balanceLiveData.setValue(new BalanceSummary(0, 0, 0));
+            chartLiveData.setValue(new ChartData());
+        });
+    }
+
     private class FastValueListener implements ValueEventListener {
         private final boolean isChi;
 
@@ -126,7 +145,6 @@ public class DataRepository {
 
         @Override
         public void onDataChange(@NonNull DataSnapshot snapshot) {
-            // Chạy parse + sort trên background để UI mượt
             bgExecutor.execute(() -> {
                 Map<String, Transaction> newCache = new ConcurrentHashMap<>();
                 List<Transaction> list = new ArrayList<>((int) snapshot.getChildrenCount());
@@ -136,6 +154,7 @@ public class DataRepository {
                         Transaction t = child.getValue(Transaction.class);
                         if (t != null) {
                             t.setKey(child.getKey());
+                            t.setExpense(isChi);
                             newCache.put(child.getKey(), t);
                             list.add(t);
                         }
@@ -144,12 +163,10 @@ public class DataRepository {
                     }
                 }
 
-                // Sort theo thời gian giảm dần (nhanh nhất với Comparator)
                 Collections.sort(list, Comparator
-                        .comparingLong(Transaction::getThoiGian)
+                        .comparingLong(Transaction::getThoi_gian)
                         .reversed());
 
-                // Update cache + LiveData trên main thread
                 mainHandler.post(() -> {
                     if (isChi) {
                         chiCache.clear();
@@ -171,78 +188,70 @@ public class DataRepository {
         }
     }
 
-    /**
-     * Tính toán lại tổng + dữ liệu biểu đồ trên background.
-     * Gọi mỗi khi data thay đổi.
-     */
     private void recomputeAggregates() {
         bgExecutor.execute(() -> {
             long totalThu = 0;
             long totalChi = 0;
 
-            // Category aggregates cho pie chart
             Map<String, Long> chiByCategory = new HashMap<>();
             Map<String, Long> thuByCategory = new HashMap<>();
-
-            // Monthly aggregates cho bar/line chart (key = yyyy-MM)
             Map<String, Long> chiByMonth = new HashMap<>();
             Map<String, Long> thuByMonth = new HashMap<>();
 
             for (Transaction t : chiCache.values()) {
-                totalChi += t.getSoTien();
-                String cat = t.getDanhMuc() != null ? t.getDanhMuc() : "Khác";
-                chiByCategory.merge(cat, t.getSoTien(), Long::sum);
-
+                long amount = t.getSo_tien();
+                totalChi += amount;
+                String cat = (t.getDanh_muc() != null && !t.getDanh_muc().isEmpty())
+                        ? t.getDanh_muc() : "Khác";
+                chiByCategory.merge(cat, amount, Long::sum);
                 String month = extractMonth(t.getNgay());
                 if (month != null) {
-                    chiByMonth.merge(month, t.getSoTien(), Long::sum);
+                    chiByMonth.merge(month, amount, Long::sum);
                 }
             }
 
             for (Transaction t : thuCache.values()) {
-                totalThu += t.getSoTien();
-                String cat = t.getDanhMuc() != null ? t.getDanhMuc() : "Khác";
-                thuByCategory.merge(cat, t.getSoTien(), Long::sum);
-
+                long amount = t.getSo_tien();
+                totalThu += amount;
+                String cat = (t.getDanh_muc() != null && !t.getDanh_muc().isEmpty())
+                        ? t.getDanh_muc() : "Khác";
+                thuByCategory.merge(cat, amount, Long::sum);
                 String month = extractMonth(t.getNgay());
                 if (month != null) {
-                    thuByMonth.merge(month, t.getSoTien(), Long::sum);
+                    thuByMonth.merge(month, amount, Long::sum);
                 }
             }
 
-            BalanceSummary summary = new BalanceSummary(totalThu, totalChi, totalThu - totalChi);
-            ChartData chart = new ChartData(chiByCategory, thuByCategory, chiByMonth, thuByMonth);
+            final long fThu = totalThu;
+            final long fChi = totalChi;
+            final ChartData chartData = new ChartData(chiByCategory, thuByCategory, chiByMonth, thuByMonth);
 
             mainHandler.post(() -> {
-                balanceLiveData.setValue(summary);
-                chartLiveData.setValue(chart);
+                balanceLiveData.setValue(new BalanceSummary(fThu, fChi, fThu - fChi));
+                chartLiveData.setValue(chartData);
             });
         });
     }
 
-    private String extractMonth(String ngay) {
-        if (ngay == null || ngay.length() < 7) return null;
-        return ngay.substring(0, 7); // yyyy-MM
+    private static String extractMonth(String ngay) {
+        if (ngay != null && ngay.length() >= 7) {
+            return ngay.substring(0, 7);
+        }
+        return null;
     }
-
-    // ====================== CRUD ======================
 
     public void addTransaction(boolean isChi, Transaction t, OnCompleteListener listener) {
         FirebaseUser user = auth.getCurrentUser();
-        if (user == null) {
-            if (listener != null) listener.onError("Chưa đăng nhập");
+        if (user == null || t == null) {
+            if (listener != null) listener.onError("Dữ liệu không hợp lệ");
             return;
+        }
+        if (t.getThoi_gian() <= 0) {
+            t.setThoi_gian(System.currentTimeMillis());
         }
         DatabaseReference ref = db.getReference("users").child(user.getUid())
-                .child(isChi ? NODE_CHI : NODE_THU);
-        String key = ref.push().getKey();
-        if (key == null) {
-            if (listener != null) listener.onError("Không tạo được key");
-            return;
-        }
-        t.setKey(key);
-        t.setThoiGian(System.currentTimeMillis());
-        ref.child(key).setValue(t)
+                .child(isChi ? NODE_CHI : NODE_THU).push();
+        ref.setValue(t.toMap())
                 .addOnSuccessListener(aVoid -> {
                     if (listener != null) listener.onSuccess();
                 })
@@ -251,15 +260,15 @@ public class DataRepository {
                 });
     }
 
-    public void updateTransaction(boolean isChi, Transaction t, OnCompleteListener listener) {
+    public void updateTransaction(boolean isChi, String key, Transaction t, OnCompleteListener listener) {
         FirebaseUser user = auth.getCurrentUser();
-        if (user == null || t.getKey() == null) {
+        if (user == null || key == null || t == null) {
             if (listener != null) listener.onError("Dữ liệu không hợp lệ");
             return;
         }
         DatabaseReference ref = db.getReference("users").child(user.getUid())
-                .child(isChi ? NODE_CHI : NODE_THU).child(t.getKey());
-        ref.setValue(t)
+                .child(isChi ? NODE_CHI : NODE_THU).child(key);
+        ref.setValue(t.toMap())
                 .addOnSuccessListener(aVoid -> {
                     if (listener != null) listener.onSuccess();
                 })
@@ -284,8 +293,6 @@ public class DataRepository {
                     if (listener != null) listener.onError(e.getMessage());
                 });
     }
-
-    // ====================== DATA CLASSES ======================
 
     public static class BalanceSummary {
         public final long totalThu;

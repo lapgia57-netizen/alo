@@ -12,13 +12,17 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
+import com.google.firebase.auth.FirebaseAuth;
 import com.moneytp.sothuchi.model.Transaction;
-import com.moneytp.sothuchi.util.FirebaseHelper;
+import com.moneytp.sothuchi.util.DataRepository;
 
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Locale;
 
+/**
+ * Thêm / Sửa giao dịch — Material TextInput, validation chặt.
+ */
 public class AddEditActivity extends AppCompatActivity {
 
     public static final String EXTRA_TYPE = "type";
@@ -30,10 +34,11 @@ public class AddEditActivity extends AppCompatActivity {
     private ProgressBar progressBar;
     private TextView tvTitle;
 
-    private FirebaseHelper firebaseHelper;
+    private DataRepository repository;
     private String type;
     private String editKey;
     private boolean isEdit = false;
+    private boolean isChi = true;
     private final Calendar calendar = Calendar.getInstance();
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
 
@@ -42,14 +47,16 @@ public class AddEditActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_add_edit);
 
-        firebaseHelper = new FirebaseHelper();
-        if (!firebaseHelper.isLoggedIn()) {
+        if (FirebaseAuth.getInstance().getCurrentUser() == null) {
             finish();
             return;
         }
 
+        repository = DataRepository.getInstance();
+
         type = getIntent().getStringExtra(EXTRA_TYPE);
-        if (type == null) type = FirebaseHelper.TYPE_CHI;
+        if (type == null) type = DataRepository.NODE_CHI;
+        isChi = DataRepository.NODE_CHI.equals(type);
 
         editKey = getIntent().getStringExtra(EXTRA_KEY);
         isEdit = editKey != null && !editKey.isEmpty();
@@ -62,7 +69,7 @@ public class AddEditActivity extends AppCompatActivity {
             Transaction t = (Transaction) getIntent().getSerializableExtra(EXTRA_TRANSACTION);
             if (t != null) populateForm(t);
         } else {
-            tvTitle.setText(FirebaseHelper.TYPE_CHI.equals(type) ? "Thêm chi tiêu" : "Thêm thu nhập");
+            tvTitle.setText(isChi ? "Thêm chi tiêu" : "Thêm thu nhập");
             etDate.setText(dateFormat.format(calendar.getTime()));
         }
 
@@ -84,35 +91,28 @@ public class AddEditActivity extends AppCompatActivity {
 
     private void setupDatePicker() {
         etDate.setOnClickListener(v -> {
-            DatePickerDialog dialog = new DatePickerDialog(this,
-                    (view, year, month, dayOfMonth) -> {
-                        calendar.set(year, month, dayOfMonth);
-                        etDate.setText(dateFormat.format(calendar.getTime()));
-                    },
-                    calendar.get(Calendar.YEAR),
-                    calendar.get(Calendar.MONTH),
-                    calendar.get(Calendar.DAY_OF_MONTH));
-            dialog.show();
+            new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
+                calendar.set(year, month, dayOfMonth);
+                etDate.setText(dateFormat.format(calendar.getTime()));
+            }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH),
+                    calendar.get(Calendar.DAY_OF_MONTH)).show();
         });
+        etDate.setFocusable(false);
+        etDate.setClickable(true);
     }
 
     private void populateForm(Transaction t) {
-        etDate.setText(t.getNgay() != null ? t.getNgay() : "");
-        etCategory.setText(t.getDanh_muc() != null ? t.getDanh_muc() : "");
-        etDescription.setText(t.getMo_ta() != null ? t.getMo_ta() : "");
+        if (t.getNgay() != null) etDate.setText(t.getNgay());
+        if (t.getDanh_muc() != null) etCategory.setText(t.getDanh_muc());
+        if (t.getMo_ta() != null) etDescription.setText(t.getMo_ta());
         etAmount.setText(String.valueOf(t.getSo_tien()));
-        etNote.setText(t.getGhi_chu() != null ? t.getGhi_chu() : "");
-        if (t.getNgay() != null) {
-            try {
-                calendar.setTime(dateFormat.parse(t.getNgay()));
-            } catch (Exception ignored) { }
-        }
+        if (t.getGhi_chu() != null) etNote.setText(t.getGhi_chu());
     }
 
     private void save() {
-        String ngay = etDate.getText() != null ? etDate.getText().toString().trim() : "";
         String danhMuc = etCategory.getText() != null ? etCategory.getText().toString().trim() : "";
         String moTa = etDescription.getText() != null ? etDescription.getText().toString().trim() : "";
+        String ngay = etDate.getText() != null ? etDate.getText().toString().trim() : "";
         String amountStr = etAmount.getText() != null ? etAmount.getText().toString().trim() : "";
         String ghiChu = etNote.getText() != null ? etNote.getText().toString().trim() : null;
 
@@ -127,8 +127,8 @@ public class AddEditActivity extends AppCompatActivity {
 
         long soTien;
         try {
-            soTien = Long.parseLong(amountStr);
-            if (soTien < 0 || soTien > 999999999999L) {
+            soTien = Long.parseLong(amountStr.replaceAll("[^0-9]", ""));
+            if (soTien < 0 || soTien > 999_999_999_999L) {
                 Toast.makeText(this, "Số tiền không hợp lệ", Toast.LENGTH_SHORT).show();
                 return;
             }
@@ -137,17 +137,17 @@ public class AddEditActivity extends AppCompatActivity {
             return;
         }
 
-        // Giới hạn độ dài giống app gốc
         if (danhMuc.length() > 100) danhMuc = danhMuc.substring(0, 100);
         if (moTa.length() > 300) moTa = moTa.substring(0, 300);
         if (ghiChu != null && ghiChu.isEmpty()) ghiChu = null;
         if (ghiChu != null && ghiChu.length() > 80) ghiChu = ghiChu.substring(0, 80);
 
         Transaction transaction = new Transaction(danhMuc, moTa, ngay, soTien, ghiChu);
+        transaction.setExpense(isChi);
 
         setLoading(true);
 
-        FirebaseHelper.SimpleCallback callback = new FirebaseHelper.SimpleCallback() {
+        DataRepository.OnCompleteListener callback = new DataRepository.OnCompleteListener() {
             @Override
             public void onSuccess() {
                 setLoading(false);
@@ -162,9 +162,9 @@ public class AddEditActivity extends AppCompatActivity {
         };
 
         if (isEdit) {
-            firebaseHelper.updateTransaction(type, editKey, transaction, callback);
+            repository.updateTransaction(isChi, editKey, transaction, callback);
         } else {
-            firebaseHelper.addTransaction(type, transaction, callback);
+            repository.addTransaction(isChi, transaction, callback);
         }
     }
 
