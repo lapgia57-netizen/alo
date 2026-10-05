@@ -31,37 +31,24 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      # Đã sửa: Sử dụng action chính chủ của thiết lập Android giúp tự động nhận diện SDK chuẩn xác hơn
+      # Sử dụng Action chính thức để chuẩn bị môi trường Android SDK toàn diện
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
           packages: 'platforms;android-34 build-tools;34.0.0'
 
-      # Đã sửa: Thêm biến môi trường JAVA_OPTS="" để chặn lỗi "-Xmx64m" khi khởi tạo wrapper
-      - name: Grant execute permission for gradlew
-        run: |
-          if [ -f gradlew ]; then 
-            chmod +x gradlew
-          else 
-            gradle wrapper --gradle-version 8.4 || true
-            chmod +x gradlew || true
-          fi
-        env:
-          JAVA_OPTS: ""
-
       - name: Create local.properties
         run: echo "sdk.dir=${{ env.ANDROID_HOME }}" > local.properties
 
-      # Đã sửa: Làm sạch môi trường chạy bằng cách truyền cả JAVA_OPTS trống để triệt tiêu bug map bộ nhớ của GitHub runner
+      # SỬA LỖI TẠI ĐÂY: Dùng trực tiếp lệnh 'gradle' hệ thống thay vì './gradlew' để triệt tiêu lỗi tải Jar tệp tin nén
       - name: Build APK
         run: |
           if [ "${{ matrix.build-type }}" = "debug" ]; then
-            ./gradlew assembleDebug --no-daemon --stacktrace
+            gradle assembleDebug --no-daemon --stacktrace
           else
-            ./gradlew assembleRelease --no-daemon --stacktrace
+            gradle assembleRelease --no-daemon --stacktrace
           fi
         env:
-          JAVA_OPTS: ""
           GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx2g"
 
       - name: Upload APK Artifact
