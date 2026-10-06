@@ -46,7 +46,9 @@ public class FirebaseHelper {
 
     public FirebaseHelper() {
         auth = FirebaseAuth.getInstance();
-        dbRoot = FirebaseDatabase.getInstance().getReference();
+        // Dùng cùng URL với DataRepository để truy vấn chính xác cùng Realtime Database
+        dbRoot = FirebaseDatabase.getInstance(
+                "https://tienbothi-default-rtdb.firebaseio.com").getReference();
     }
 
     public FirebaseUser getCurrentUser() {

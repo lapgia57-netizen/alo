@@ -43,4 +43,7 @@
     <color name="black">#000000</color>
     <color name="white">#FFFFFF</color>
     <color name="transparent">#00000000</color>
+
+    <!-- Adaptive launcher icon background (required by mipmap-anydpi-v26/ic_launcher.xml) -->
+    <color name="ic_launcher_background">#4F46E5</color>
 </resources>
